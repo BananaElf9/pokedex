@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokédex — All Pokémon</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="title-group">
+        <div class="pokeball" aria-hidden="true"></div>
+        <div>
+          <p class="eyebrow">Pokédex</p>
+          <h1>All Pokémon</h1>
+          <p class="subtitle">Tap any card to view details</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html">Detail view</a>
+      </nav>
+    </header>
+
+    <section class="toolbar">
+      <div class="toolbar__left">
+        <label class="label" for="sort-select">Sort by</label>
+        <select id="sort-select">
+          <option value="number">Number</option>
+          <option value="name">Name</option>
+          <option value="type">Type</option>
+        </select>
+      </div>
+      <div class="toolbar__search">
+        <label class="sr-only" for="search-list">Search by name or ID</label>
+        <input id="search-list" type="text" placeholder="Search name or ID..." autocomplete="off" />
+      </div>
+      <div id="load-status" class="status" role="status" aria-live="polite">Loading list…</div>
+    </section>
+
+    <section class="filters">
+      <p class="label">Filter by type</p>
+      <div id="type-filters" class="filters__grid" role="group" aria-label="Filter by type"></div>
+    </section>
+
+    <main class="grid" id="pokemon-grid" aria-live="polite"></main>
+  </div>
+
+  <script src="list.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokedex</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <a class="title-group" href="list.html" aria-label="View all Pokémon">
+        <div class="pokeball" aria-hidden="true"></div>
+        <div>
+          <p class="eyebrow">Pokédex</p>
+          <h1>Micah's Pokédex</h1>
+          <p class="subtitle">Powered by Micah and Daddy</p>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a href="list.html">All Pokémon</a>
+      </nav>
+      <form id="search-form" class="search">
+        <label class="sr-only" for="search-input">Search by name or ID</label>
+        <input id="search-input" name="query" type="text" placeholder="e.g. pikachu or 25" autocomplete="off" required />
+        <button type="submit">Search</button>
+        <button type="button" id="random-btn" class="ghost">Random</button>
+      </form>
+    </header>
+
+    <main class="content">
+      <section id="status" class="status" role="status" aria-live="polite"></section>
+      <div class="pager">
+        <button type="button" id="prev-btn" aria-label="Previous Pokémon">← Prev</button>
+        <button type="button" id="next-btn" aria-label="Next Pokémon">Next →</button>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="details">Details</button>
+        <button class="tab" data-tab="evolution">Evolution</button>
+        <button class="tab" data-tab="gallery">Gallery</button>
+        <button class="tab" data-tab="moves">Moves</button>
+        <button class="tab" data-tab="battle">Battle Data</button>
+      </div>
+      <section id="card" class="card tab-panel" data-tab-panel="details" hidden>
+        <div class="card__header">
+          <div class="card__title">
+            <p class="eyebrow" id="poke-id">#000</p>
+            <h2 id="poke-name">Pokemon</h2>
+            <p id="genus" class="genus">—</p>
+            <p id="flavor" class="flavor">—</p>
+            <p id="biology" class="flavor">—</p>
+            <div id="types" class="types"></div>
+          </div>
+          <img id="sprite" class="sprite" alt="Pokemon sprite" src="" />
+        </div>
+
+        <div class="card__meta">
+          <div>
+            <p class="label">Height</p>
+            <p id="height" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Weight</p>
+            <p id="weight" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Base Exp</p>
+              <p id="base-exp" class="value badge">—</p>
+          </div>
+          <div>
+            <p class="label">Gender Ratio</p>
+            <p id="gender" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Egg Groups</p>
+            <p id="egg-groups" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Habitat</p>
+            <p id="habitat" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Locations</p>
+            <p id="locations" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Versions</p>
+            <p id="versions" class="value">—</p>
+          </div>
+        </div>
+
+        <div class="card__body">
+          <div>
+            <p class="label">Abilities</p>
+            <ul id="abilities" class="chips"></ul>
+          </div>
+
+          <div>
+            <p class="label">Regional / Other Forms</p>
+            <ul id="forms" class="chips"></ul>
+          </div>
+
+          <div>
+            <div class="label-row">
+              <p class="label">Stats</p>
+              <p class="value badge" id="bst">Base Stat Total: —</p>
+            </div>
+            <ul id="stats" class="stats"></ul>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="card tab-panel" data-tab-panel="evolution" hidden>
+        <div class="card__title">
+          <h2>Evolution</h2>
+          <p class="subtitle">Tap a stage to open its details</p>
+        </div>
+        <div id="evolution-container" class="evolution"></div>
+      </section>
+
+      <section class="card tab-panel" data-tab-panel="gallery" hidden>
+        <div class="card__title">
+          <h2>Gallery</h2>
+          <p class="subtitle">Default, shiny, artwork, and alternative sprites</p>
+        </div>
+        <div id="gallery" class="gallery"></div>
+      </section>
+
+      <section class="card tab-panel" data-tab-panel="moves" hidden>
+        <div class="card__title">
+          <h2>Moves</h2>
+          <p class="subtitle">Level-up, machine (TM/HM/TR), and breeding moves</p>
+        </div>
+        <div class="moves-grid">
+          <div>
+            <p class="label">Level Up</p>
+            <ul id="moves-level" class="moves-list"></ul>
+          </div>
+          <div>
+            <p class="label">TM/HM/TR</p>
+            <ul id="moves-machine" class="moves-list"></ul>
+          </div>
+          <div>
+            <p class="label">Breeding</p>
+            <ul id="moves-egg" class="moves-list"></ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="card tab-panel" data-tab-panel="battle" hidden>
+        <div class="card__title">
+          <h2>Battle Data</h2>
+          <p class="subtitle">Type weaknesses, resistances, and immunities</p>
+        </div>
+        <div class="battle-grid">
+          <div>
+            <p class="label">Super Effective</p>
+            <ul id="eff-weak" class="chips"></ul>
+          </div>
+          <div>
+            <p class="label">Resist</p>
+            <ul id="eff-resist" class="chips"></ul>
+          </div>
+          <div>
+            <p class="label">Immune</p>
+            <ul id="eff-immune" class="chips"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+

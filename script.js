@@ -1,0 +1,863 @@
+(() => {
+  const API_BASE = 'https://pokeapi.co/api/v2/pokemon/';
+  const MAX_ID = 1025; // Updated National Dex count
+
+  const form = document.getElementById('search-form');
+  const input = document.getElementById('search-input');
+  const randomBtn = document.getElementById('random-btn');
+  const prevBtn = document.getElementById('prev-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const tabs = document.querySelectorAll('.tab');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+  const evolutionContainer = document.getElementById('evolution-container');
+  const statusEl = document.getElementById('status');
+  const card = document.getElementById('card');
+  const spriteEl = document.getElementById('sprite');
+  const idEl = document.getElementById('poke-id');
+  const nameEl = document.getElementById('poke-name');
+  const typesEl = document.getElementById('types');
+  const heightEl = document.getElementById('height');
+  const weightEl = document.getElementById('weight');
+  const baseExpEl = document.getElementById('base-exp');
+  const genderEl = document.getElementById('gender');
+  const eggEl = document.getElementById('egg-groups');
+  const habitatEl = document.getElementById('habitat');
+  const locationsEl = document.getElementById('locations');
+  const versionsEl = document.getElementById('versions');
+  const abilitiesEl = document.getElementById('abilities');
+  const statsEl = document.getElementById('stats');
+  const bstEl = document.getElementById('bst');
+  const movesLevelEl = document.getElementById('moves-level');
+  const movesMachineEl = document.getElementById('moves-machine');
+  const movesEggEl = document.getElementById('moves-egg');
+  const galleryEl = document.getElementById('gallery');
+  const flavorEl = document.getElementById('flavor');
+  const genusEl = document.getElementById('genus');
+  const formsEl = document.getElementById('forms');
+  const effWeakEl = document.getElementById('eff-weak');
+  const effResistEl = document.getElementById('eff-resist');
+  const effImmuneEl = document.getElementById('eff-immune');
+
+  let currentId = null;
+  let currentName = null;
+  const abilityCache = new Map();
+  const locationCache = new Map();
+  const typeCache = new Map();
+  const spriteVariants = [
+    { label: 'Official', path: ['other', 'official-artwork', 'front_default'] },
+    { label: 'Official Shiny', path: ['other', 'official-artwork', 'front_shiny'] },
+    { label: 'Dream World', path: ['other', 'dream-world', 'front_default'] },
+    { label: 'Default', path: ['front_default'] },
+    { label: 'Shiny', path: ['front_shiny'] },
+    { label: 'Female', path: ['front_female'] },
+    { label: 'Shiny Female', path: ['front_shiny_female'] },
+    { label: 'Back', path: ['back_default'] },
+    { label: 'Back Shiny', path: ['back_shiny'] },
+    { label: 'Back Female', path: ['back_female'] },
+    { label: 'Back Shiny Female', path: ['back_shiny_female'] }
+  ];
+
+  const typeColors = {
+    normal: '#a8a77a',
+    fire: '#ee8130',
+    water: '#6390f0',
+    electric: '#f7d02c',
+    grass: '#7ac74c',
+    ice: '#96d9d6',
+    fighting: '#c22e28',
+    poison: '#a33ea1',
+    ground: '#e2bf65',
+    flying: '#a98ff3',
+    psychic: '#f95587',
+    bug: '#a6b91a',
+    rock: '#b6a136',
+    ghost: '#735797',
+    dragon: '#6f35fc',
+    dark: '#705746',
+    steel: '#b7b7ce',
+    fairy: '#d685ad'
+  };
+
+  function setStatus(message, tone = 'muted') {
+    statusEl.textContent = message;
+    statusEl.dataset.tone = tone;
+  }
+
+  function setActiveTab(target) {
+    tabs.forEach(tab => {
+      const isActive = tab.dataset.tab === target;
+      tab.classList.toggle('active', isActive);
+    });
+    tabPanels.forEach(panel => {
+      const isActive = panel.dataset.tabPanel === target;
+      panel.hidden = !isActive;
+    });
+  }
+
+  function normalizeQuery(raw) {
+    return String(raw ?? '').trim().toLowerCase();
+  }
+
+  async function fetchPokemon(query) {
+    const normalized = normalizeQuery(query);
+    if (!normalized) {
+      throw new Error('Please enter a name or ID.');
+    }
+
+    const url = `${API_BASE}${encodeURIComponent(normalized)}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error('Pokémon not found. Try another name or ID.');
+      }
+      throw new Error('Network error. Please try again.');
+    }
+    return res.json();
+  }
+
+  function spriteUrl(id) {
+    return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+  }
+
+  function formatGender(genderRate) {
+    if (genderRate === -1) return 'Genderless';
+    const female = (genderRate / 8) * 100;
+    const male = 100 - female;
+    const fmt = v => `${Math.round(v)}%`;
+    return `${fmt(male)} / ${fmt(female)}`;
+  }
+
+  function renderTypes(types) {
+    typesEl.innerHTML = '';
+    types.forEach(({ type }) => {
+      const pill = document.createElement('span');
+      pill.className = 'type-pill';
+      pill.textContent = type.name;
+      pill.style.background = typeColors[type.name] || '#e2e8f0';
+      typesEl.appendChild(pill);
+    });
+  }
+
+  function renderAbilities(abilities) {
+    abilitiesEl.innerHTML = '';
+    abilities.forEach(({ ability, is_hidden, effect_text }) => {
+      const li = document.createElement('li');
+      li.className = 'chip';
+      const title = document.createElement('div');
+      title.className = 'ability-title';
+      title.textContent = `${ability.name}${is_hidden ? ' (hidden)' : ''}`;
+      const desc = document.createElement('p');
+      desc.className = 'ability-desc';
+      desc.textContent = effect_text || '—';
+      li.append(title, desc);
+      abilitiesEl.appendChild(li);
+    });
+  }
+
+  function renderStats(stats) {
+    statsEl.innerHTML = '';
+    const total = stats.reduce((sum, { base_stat }) => sum + base_stat, 0);
+    if (bstEl) bstEl.textContent = `Base Stat Total: ${total}`;
+    stats.forEach(({ base_stat, stat }) => {
+      const row = document.createElement('li');
+      row.className = 'stat-row';
+
+      const name = document.createElement('span');
+      name.className = 'stat-name';
+      name.textContent = stat.name;
+
+      const bar = document.createElement('div');
+      bar.className = 'stat-bar';
+      const fill = document.createElement('div');
+      fill.className = 'stat-fill';
+      fill.style.width = `${Math.min(base_stat, 200) / 2.5}%`; // shorter scale
+      fill.style.background = statColor(stat.name);
+      bar.appendChild(fill);
+
+      const value = document.createElement('span');
+      value.className = 'value';
+      const { min, max } = statRange(base_stat, stat.name === 'hp');
+      value.textContent = `${base_stat} (${min}/${max})`;
+
+      row.append(name, bar, value);
+      statsEl.appendChild(row);
+    });
+  }
+
+  function renderCard(data, abilityDetails, genderText, eggGroupsText, habitatText, locationsText, versionsText, flavorText, genusText, biologyText) {
+    const { id, name, sprites, types, height, weight, base_experience, abilities, stats } = data;
+    currentId = id;
+    currentName = name;
+    idEl.textContent = `#${String(id).padStart(3, '0')}`;
+    nameEl.textContent = name;
+    spriteEl.src = sprites.other['official-artwork'].front_default || sprites.front_default;
+    spriteEl.alt = `${name} sprite`;
+
+    renderTypes(types);
+    renderAbilities(abilityDetails || abilities);
+    renderStats(stats);
+
+    heightEl.textContent = `${(height / 10).toFixed(1)} m`;
+    weightEl.textContent = `${(weight / 10).toFixed(1)} kg`;
+    baseExpEl.textContent = base_experience ?? '—';
+    if (genderEl) {
+      genderEl.textContent = genderText ?? '—';
+    }
+    if (eggEl) eggEl.textContent = eggGroupsText ?? '—';
+    if (habitatEl) habitatEl.textContent = habitatText ?? '—';
+    if (locationsEl) locationsEl.textContent = locationsText ?? '—';
+    if (versionsEl) versionsEl.textContent = versionsText ?? '—';
+    if (flavorEl) flavorEl.textContent = flavorText || '—';
+    if (genusEl) genusEl.textContent = genusText || '—';
+    const bio = biologyText || flavorText;
+    const bioEl = document.getElementById('biology');
+    if (bioEl) bioEl.textContent = bio || '—';
+
+    card.hidden = false;
+  }
+
+  function renderForms(varieties, currentName) {
+    if (!formsEl) return;
+    formsEl.innerHTML = '';
+    if (!varieties?.length) {
+      const li = document.createElement('li');
+      li.className = 'move-meta';
+      li.textContent = '—';
+      formsEl.appendChild(li);
+      return;
+    }
+    varieties.forEach(v => {
+      const li = document.createElement('li');
+      li.className = 'chip';
+      const link = document.createElement('a');
+      link.href = `index.html?pokemon=${encodeURIComponent(v.pokemon.name)}`;
+      const name = cleanName(v.pokemon.name);
+      link.textContent = v.is_default && name === currentName ? `${name} (default)` : name;
+      link.className = 'link-plain';
+      li.appendChild(link);
+      formsEl.appendChild(li);
+    });
+  }
+
+  async function fetchSpeciesFromPokemon(pokemon) {
+    const url = pokemon?.species?.url;
+    if (!url) throw new Error('Species link missing for this Pokémon.');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to load species info.');
+    return res.json();
+  }
+
+  async function resolvePokemonFromSpecies(speciesName, currentPokemonName = null) {
+    // Fetch species data from pokemon-species API
+    try {
+      const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${encodeURIComponent(speciesName)}`);
+      if (!speciesRes.ok) return { name: speciesName, id: null };
+      const speciesData = await speciesRes.json();
+      
+      // If we have a current Pokémon name that matches a variety, use that form
+      if (currentPokemonName) {
+        const matchingVariety = speciesData.varieties?.find(
+          v => v.pokemon.name.toLowerCase() === currentPokemonName.toLowerCase()
+        );
+        if (matchingVariety?.pokemon?.url) {
+          const pokemonId = parseInt(matchingVariety.pokemon.url.split('/').filter(Boolean).pop(), 10);
+          return { name: matchingVariety.pokemon.name, id: pokemonId };
+        }
+      }
+      
+      // Otherwise, get the default form (is_default: true) or first variety
+      const defaultVariety = speciesData.varieties?.find(v => v.is_default) || speciesData.varieties?.[0];
+      if (!defaultVariety?.pokemon?.url) {
+        // Fallback: try to get ID from species URL
+        const speciesId = parseInt(speciesData.id, 10);
+        return { name: speciesName, id: speciesId };
+      }
+      
+      // Extract Pokémon ID from the pokemon URL
+      const pokemonId = parseInt(defaultVariety.pokemon.url.split('/').filter(Boolean).pop(), 10);
+      return { name: defaultVariety.pokemon.name, id: pokemonId };
+    } catch (err) {
+      // Fallback: try to parse ID from species name or use species API ID
+      try {
+        const speciesRes = await fetch(`https://pokeapi.co/api/v2/pokemon-species/${encodeURIComponent(speciesName)}`);
+        if (speciesRes.ok) {
+          const speciesData = await speciesRes.json();
+          return { name: speciesName, id: parseInt(speciesData.id, 10) };
+        }
+      } catch (e) {
+        // Ignore
+      }
+      return { name: speciesName, id: null };
+    }
+  }
+
+  function evolutionMethodText(detail) {
+    if (!detail) return 'Evolves';
+    const parts = [];
+    const trigger = detail.trigger?.name;
+
+    if (trigger === 'level-up') {
+      if (detail.min_level) {
+        let timeTag = '';
+        const rawTime = detail.time_of_day;
+        if (rawTime) {
+          const time = rawTime === 'day' ? 'Day' : rawTime === 'night' ? 'Night' : cleanName(rawTime);
+          timeTag = ` (${time} only)`;
+        }
+        parts.push(`Level ${detail.min_level}${timeTag}`);
+      } else {
+        parts.push('Level up');
+      }
+      if (detail.min_happiness) parts.push('High friendship');
+      if (detail.min_affection) parts.push(`Affection ${detail.min_affection}+`);
+      if (detail.min_beauty) parts.push(`Beauty ${detail.min_beauty}+`);
+      if (detail.time_of_day && !detail.min_level) {
+        const pretty = detail.time_of_day === 'day' ? 'Daytime only' : detail.time_of_day === 'night' ? 'Night only' : detail.time_of_day;
+        parts.push(pretty);
+      }
+      if (detail.known_move?.name) parts.push(`Knowing ${cleanName(detail.known_move.name)}`);
+      if (detail.known_move_type?.name) parts.push(`Knowing a ${cleanName(detail.known_move_type.name)} move`);
+      if (detail.location?.name) parts.push(`at ${cleanName(detail.location.name)}`);
+      if (detail.needs_overworld_rain) parts.push('While raining');
+      if (detail.party_species?.name) parts.push(`With ${cleanName(detail.party_species.name)} in party`);
+      if (detail.party_type?.name) parts.push(`With a ${cleanName(detail.party_type.name)} type in party`);
+      if (typeof detail.relative_physical_stats === 'number') {
+        const rel = detail.relative_physical_stats;
+        if (rel > 0) parts.push('Atk > Def');
+        else if (rel < 0) parts.push('Atk < Def');
+        else parts.push('Atk = Def');
+      }
+      if (detail.turn_upside_down) parts.push('Hold console upside-down');
+    } else if (trigger === 'use-item' && detail.item?.name) {
+      parts.push(`Use ${cleanName(detail.item.name)}`);
+    } else if (trigger === 'trade') {
+      parts.push('Trade');
+      if (detail.held_item?.name) parts.push(`holding ${cleanName(detail.held_item.name)}`);
+      if (detail.trade_species?.name) parts.push(`for ${cleanName(detail.trade_species.name)}`);
+    } else if (trigger) {
+      parts.push(cleanName(trigger));
+    }
+
+    if (detail.gender === 1) parts.push('Female only');
+    if (detail.gender === 2) parts.push('Male only');
+
+    return parts.length ? parts.join(', ') : 'Evolves';
+  }
+
+  async function fetchEvolutionChainFromSpecies(species, currentPokemonName = null) {
+    const chainUrl = species?.evolution_chain?.url;
+    if (!chainUrl) return [];
+
+    const chainRes = await fetch(chainUrl);
+    if (!chainRes.ok) throw new Error('Failed to load evolution chain.');
+    const chain = await chainRes.json();
+
+    const paths = [];
+    async function walk(node, pathSoFar = [], methodText = null, isRoot = false) {
+      if (!node) return;
+      const speciesName = node.species.name;
+      const pokemonData = await resolvePokemonFromSpecies(
+        speciesName,
+        isRoot ? currentPokemonName : null
+      );
+      const nextPath = [...pathSoFar, { name: pokemonData.name, id: pokemonData.id, method: methodText }];
+
+      if (!node.evolves_to || node.evolves_to.length === 0) {
+        paths.push(nextPath);
+        return;
+      }
+
+      await Promise.all(
+        node.evolves_to.map(async next => {
+          const detail = next.evolution_details?.[0];
+          const text = evolutionMethodText(detail);
+          await walk(next, nextPath, text, false);
+        })
+      );
+    }
+
+    await walk(chain.chain, [], null, true);
+
+    if (currentPokemonName) {
+      const target = currentPokemonName.toLowerCase();
+      const filtered = paths
+        .map(path => {
+          const idx = path.findIndex(node => node.name.toLowerCase() === target);
+          return idx === -1 ? null : path.slice(idx);
+        })
+        .filter(Boolean);
+      if (filtered.length) return filtered;
+    }
+
+    return paths;
+  }
+
+  function renderEvolution(paths, currentPokemon) {
+    if (!evolutionContainer) return;
+    evolutionContainer.innerHTML = '';
+    if (!paths.length) {
+      const empty = document.createElement('p');
+      empty.className = 'subtitle';
+      empty.textContent = 'No evolution data.';
+      evolutionContainer.appendChild(empty);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+
+    paths.forEach(path => {
+      const row = document.createElement('div');
+      row.className = 'evo-path';
+
+      path.forEach((node, idx) => {
+        const card = document.createElement('a');
+        card.className = 'evo-node';
+        card.href = `index.html?pokemon=${encodeURIComponent(node.name)}`;
+
+        const isCurrent =
+          currentPokemon &&
+          (node.name.toLowerCase() === currentPokemon.name?.toLowerCase() ||
+            (node.name.toLowerCase() === currentPokemon.species?.name?.toLowerCase() &&
+              currentPokemon.name?.includes('-')));
+        const displayName = isCurrent ? currentPokemon.name : node.name;
+        const displayId = isCurrent ? currentPokemon.id : node.id;
+
+        const img = document.createElement('img');
+        img.src =
+          (isCurrent
+            ? currentPokemon.sprites?.other?.['official-artwork']?.front_default ||
+              currentPokemon.sprites?.front_default
+            : null) || spriteUrl(displayId);
+        img.alt = displayName;
+        img.loading = 'lazy';
+
+        const name = document.createElement('p');
+        name.className = 'mini-card__name';
+        name.textContent = displayName;
+
+        const idTag = document.createElement('p');
+        idTag.className = 'eyebrow';
+        idTag.textContent = `#${String(displayId ?? '').padStart(3, '0')}`;
+
+        card.append(img, name, idTag);
+        row.appendChild(card);
+
+        const next = path[idx + 1];
+        if (next) {
+          const arrowWrap = document.createElement('div');
+          arrowWrap.className = 'evo-arrow';
+          const method = document.createElement('p');
+          method.className = 'evo-method';
+          method.textContent = next.method || 'Evolves';
+          const arrow = document.createElement('span');
+          arrow.textContent = '→';
+          arrowWrap.append(method, arrow);
+          row.appendChild(arrowWrap);
+        }
+      });
+
+      frag.appendChild(row);
+    });
+
+    evolutionContainer.appendChild(frag);
+  }
+
+
+  function abilityEffectText(ability) {
+    if (!ability) return null;
+    const entry = ability.effect_entries?.find(e => e.language.name === 'en');
+    if (entry?.short_effect) return entry.short_effect;
+    const flavor = ability.flavor_text_entries?.find(e => e.language.name === 'en');
+    return flavor?.flavor_text?.replace(/\s+/g, ' ') || null;
+  }
+
+  async function enrichAbilities(list) {
+    const results = await Promise.all(
+      list.map(async entry => {
+        const cached = abilityCache.get(entry.ability.name);
+        if (cached) return { ...entry, effect_text: cached };
+        try {
+          const res = await fetch(entry.ability.url);
+          if (!res.ok) throw new Error('bad ability');
+          const ability = await res.json();
+          const text = abilityEffectText(ability);
+          abilityCache.set(entry.ability.name, text);
+          return { ...entry, effect_text: text };
+        } catch (err) {
+          return { ...entry, effect_text: null };
+        }
+      })
+    );
+    return results;
+  }
+
+  function cleanName(text) {
+    return text?.replace(/-/g, ' ') ?? '';
+  }
+
+  function deepGet(obj, path) {
+    return path.reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : null), obj);
+  }
+
+  function renderGallery(sprites) {
+    if (!galleryEl) return;
+    galleryEl.innerHTML = '';
+    const seen = new Set();
+    const frag = document.createDocumentFragment();
+
+    spriteVariants.forEach(variant => {
+      const url = deepGet(sprites, variant.path);
+      if (!url || seen.has(url)) return;
+      seen.add(url);
+
+      const card = document.createElement('div');
+      card.className = 'gallery-card';
+
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = `${variant.label} sprite`;
+      img.loading = 'lazy';
+
+      const label = document.createElement('p');
+      label.className = 'label';
+      label.textContent = variant.label;
+
+      card.append(img, label);
+      frag.appendChild(card);
+    });
+
+    if (!frag.childNodes.length) {
+      const empty = document.createElement('p');
+      empty.className = 'subtitle';
+      empty.textContent = 'No additional sprites available.';
+      galleryEl.appendChild(empty);
+      return;
+    }
+
+    galleryEl.appendChild(frag);
+  }
+
+  function renderMoves({ level = [], machine = [], egg = [] }) {
+    const fillList = (el, items, formatter) => {
+      el.innerHTML = '';
+      if (!items.length) {
+        const li = document.createElement('li');
+        li.className = 'move-meta';
+        li.textContent = '—';
+        el.appendChild(li);
+        return;
+      }
+      items.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'move-chip';
+        const name = document.createElement('span');
+        name.textContent = cleanName(item.name);
+        const meta = document.createElement('span');
+        meta.className = 'move-meta';
+        meta.textContent = formatter(item);
+
+        const type = document.createElement('span');
+        type.className = 'move-type-pill';
+        if (item.type) {
+          type.textContent = cleanName(item.type);
+          const color = typeColors[item.type] || '#94a3b8';
+          type.style.background = color;
+          const textColor = (() => {
+            const hex = color.replace('#', '');
+            if (hex.length !== 6) return '#0f172a';
+            const num = parseInt(hex, 16);
+            const r = (num >> 16) & 255;
+            const g = (num >> 8) & 255;
+            const b = num & 255;
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminance > 0.7 ? '#0f172a' : '#fff';
+          })();
+          type.style.color = textColor;
+        } else {
+          type.textContent = '';
+        }
+
+        li.append(name, meta, type);
+        el.appendChild(li);
+      });
+    };
+
+    fillList(movesLevelEl, level, m => `Lv ${m.level || '?'}`);
+    fillList(movesMachineEl, machine, m => m.source || 'TM/TR');
+    fillList(movesEggEl, egg, () => 'Egg');
+  }
+
+  async function groupMoves(moves) {
+    const buckets = { level: [], machine: [], egg: [] };
+    await Promise.all(
+      moves.map(async entry => {
+        const moveName = entry.move.name;
+        const moveUrl = entry.move.url;
+        if (!entry.version_group_details?.length) return;
+        const detail = entry.version_group_details.reduce((best, cur) => {
+          if (!best) return cur;
+          if ((cur.level_learned_at || 0) > (best.level_learned_at || 0)) return cur;
+          return best;
+        }, null);
+        if (!detail) return;
+        const method = detail.move_learn_method?.name;
+        let type = '';
+        try {
+          if (moveUrl) {
+            const res = await fetch(moveUrl);
+            if (res.ok) {
+              const mv = await res.json();
+              type = mv.type?.name || '';
+            }
+          }
+        } catch (err) {
+          // ignore fetch errors for move types
+        }
+        const common = { name: moveName, type };
+        if (method === 'level-up') {
+          buckets.level.push({ ...common, level: detail.level_learned_at });
+        } else if (method === 'machine') {
+          buckets.machine.push({ ...common, source: 'TM/TR' });
+        } else if (method === 'egg') {
+          buckets.egg.push(common);
+        }
+      })
+    );
+    buckets.level.sort((a, b) => (a.level || 0) - (b.level || 0) || a.name.localeCompare(b.name));
+    buckets.machine.sort((a, b) => a.name.localeCompare(b.name));
+    buckets.egg.sort((a, b) => a.name.localeCompare(b.name));
+    return buckets;
+  }
+
+  function statColor(name) {
+    switch (name) {
+      case 'hp':
+        return 'linear-gradient(90deg, #ef4444, #f97316)';
+      case 'attack':
+        return 'linear-gradient(90deg, #f97316, #facc15)';
+      case 'defense':
+        return 'linear-gradient(90deg, #facc15, #22c55e)';
+      case 'special-attack':
+        return 'linear-gradient(90deg, #06b6d4, #3b82f6)';
+      case 'special-defense':
+        return 'linear-gradient(90deg, #3b82f6, #8b5cf6)';
+      case 'speed':
+        return 'linear-gradient(90deg, #ec4899, #8b5cf6)';
+      default:
+        return 'linear-gradient(90deg, var(--accent), #fbbf24)';
+    }
+  }
+
+  function statRange(base, isHp) {
+    const lvl = 50;
+    const ivMin = 0;
+    const ivMax = 31;
+    const evMin = 0;
+    const evMax = 252;
+    const natureMinus = 0.9;
+    const naturePlus = 1.1;
+
+    const calcHp = (iv, ev) =>
+      Math.floor(((2 * base + iv + Math.floor(ev / 4)) * lvl) / 100) + lvl + 10;
+    const calcOther = (iv, ev, nature) =>
+      Math.floor((Math.floor(((2 * base + iv + Math.floor(ev / 4)) * lvl) / 100) + 5) * nature);
+
+    if (isHp) {
+      return {
+        min: calcHp(ivMin, evMin),
+        max: calcHp(ivMax, evMax)
+      };
+    }
+    return {
+      min: calcOther(ivMin, evMin, natureMinus),
+      max: calcOther(ivMax, evMax, naturePlus)
+    };
+  }
+
+  async function fetchType(name) {
+    if (typeCache.has(name)) return typeCache.get(name);
+    const res = await fetch(`https://pokeapi.co/api/v2/type/${name}`);
+    if (!res.ok) throw new Error('Failed to load type data');
+    const data = await res.json();
+    typeCache.set(name, data);
+    return data;
+  }
+
+  async function computeEffectiveness(types) {
+    const attackTypes = new Set();
+    const mult = {};
+
+    for (const t of types) {
+      const data = await fetchType(t.type.name);
+      const rel = data.damage_relations;
+      const apply = (list, factor) => {
+        list.forEach(entry => {
+          const atk = entry.name;
+          attackTypes.add(atk);
+          mult[atk] = (mult[atk] ?? 1) * factor;
+        });
+      };
+      apply(rel.double_damage_from, 2);
+      apply(rel.half_damage_from, 0.5);
+      apply(rel.no_damage_from, 0);
+    }
+
+    const categorized = {
+      weak: [],
+      resist: [],
+      immune: []
+    };
+
+    attackTypes.forEach(atk => {
+      const m = mult[atk] ?? 1;
+      if (m >= 2) categorized.weak.push({ name: atk, mult: m });
+      else if (m === 0) categorized.immune.push({ name: atk, mult: m });
+      else if (m <= 0.5) categorized.resist.push({ name: atk, mult: m });
+    });
+
+    const sortFn = (a, b) => b.mult - a.mult || a.name.localeCompare(b.name);
+    categorized.weak.sort(sortFn);
+    categorized.resist.sort(sortFn);
+    categorized.immune.sort((a, b) => a.name.localeCompare(b.name));
+    return categorized;
+  }
+
+  function renderEffectiveness(eff) {
+    const fill = (el, list) => {
+      if (!el) return;
+      el.innerHTML = '';
+      if (!list.length) {
+        const li = document.createElement('li');
+        li.className = 'move-meta';
+        li.textContent = '—';
+        el.appendChild(li);
+        return;
+      }
+      list.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'eff-chip';
+        const pill = document.createElement('span');
+        pill.className = 'type-pill-sm';
+        pill.textContent = cleanName(item.name);
+        const color = typeColors[item.name] || '#cbd5e1';
+        pill.style.background = color;
+        const textColor = (() => {
+          const hex = color.replace('#', '');
+          if (hex.length !== 6) return '#0f172a';
+          const num = parseInt(hex, 16);
+          const r = (num >> 16) & 255;
+          const g = (num >> 8) & 255;
+          const b = num & 255;
+          const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          return luminance > 0.7 ? '#0f172a' : '#fff';
+        })();
+        pill.style.color = textColor;
+        const mult = document.createElement('span');
+        mult.className = 'eff-mult';
+        mult.textContent = item.mult === 0 ? '0x' : `${item.mult}x`;
+        li.append(pill, mult);
+        el.appendChild(li);
+      });
+    };
+    fill(effWeakEl, eff.weak);
+    fill(effResistEl, eff.resist);
+    fill(effImmuneEl, eff.immune);
+  }
+
+  async function fetchLocations(url) {
+    if (!url) return [];
+    if (locationCache.has(url)) return locationCache.get(url);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('bad locations');
+      const data = await res.json();
+      const names = [...new Set(data.map(loc => cleanName(loc.location_area?.name)))].filter(Boolean);
+      const trimmed = names.slice(0, 10);
+      locationCache.set(url, trimmed);
+      return trimmed;
+    } catch (err) {
+      return [];
+    }
+  }
+
+  async function handleSearch(query) {
+    setStatus('Loading…');
+    toggleLoading(true);
+    try {
+      const pokemon = await fetchPokemon(query);
+      const abilityDetails = await enrichAbilities(pokemon.abilities || []);
+      const species = await fetchSpeciesFromPokemon(pokemon);
+      const genderText = formatGender(species.gender_rate);
+      const eggGroups = species.egg_groups?.map(g => cleanName(g.name)).join(', ') || '—';
+      const habitatText = cleanName(species.habitat?.name) || 'Unknown';
+      const locationsList = await fetchLocations(pokemon.location_area_encounters);
+      const locationsText = locationsList.length ? locationsList.join(', ') : '—';
+      const versionsText =
+        pokemon.game_indices?.map(g => cleanName(g.version?.name)).filter(Boolean).join(', ') || '—';
+      const flavorEntries = (species.flavor_text_entries || []).filter(e => e.language?.name === 'en');
+      const flavorText = flavorEntries[0]?.flavor_text?.replace(/\s+/g, ' ') || '';
+      const biologyText = flavorEntries[1]?.flavor_text?.replace(/\s+/g, ' ') || flavorText;
+      const genusText = (species.genera || []).find(g => g.language?.name === 'en')?.genus || '';
+      renderForms(species.varieties || [], pokemon.name);
+      renderCard(pokemon, abilityDetails, genderText, eggGroups, habitatText, locationsText, versionsText, flavorText, genusText, biologyText);
+      const evoChain = await fetchEvolutionChainFromSpecies(species, pokemon.name);
+      renderEvolution(evoChain, pokemon);
+      const moves = await groupMoves(pokemon.moves || []);
+      renderMoves(moves);
+      renderGallery(pokemon.sprites || {});
+      const eff = await computeEffectiveness(pokemon.types || []);
+      renderEffectiveness(eff);
+      setStatus('Found it!', 'success');
+    } catch (err) {
+      setStatus(err.message || 'Something went wrong.', 'error');
+      card.hidden = true;
+      if (evolutionContainer) evolutionContainer.innerHTML = '';
+      renderMoves({ level: [], machine: [], egg: [] });
+      renderGallery({});
+      renderEffectiveness({ weak: [], resist: [], immune: [] });
+    } finally {
+      toggleLoading(false);
+    }
+  }
+
+  function toggleLoading(isLoading) {
+    form.querySelectorAll('button, input').forEach(el => {
+      el.disabled = isLoading;
+    });
+    [prevBtn, nextBtn].forEach(btn => {
+      if (btn) btn.disabled = isLoading || currentId === null;
+    });
+  }
+
+  function navigate(delta) {
+    if (currentId === null) return;
+    const next = ((currentId - 1 + delta + MAX_ID) % MAX_ID) + 1;
+    input.value = next;
+    handleSearch(next);
+  }
+
+  form.addEventListener('submit', evt => {
+    evt.preventDefault();
+    handleSearch(input.value);
+  });
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => setActiveTab(tab.dataset.tab));
+  });
+
+  prevBtn?.addEventListener('click', () => navigate(-1));
+  nextBtn?.addEventListener('click', () => navigate(1));
+
+  randomBtn.addEventListener('click', () => {
+    const id = Math.floor(Math.random() * MAX_ID) + 1;
+    input.value = id;
+    handleSearch(id);
+  });
+
+  // Load initial Pokémon from query param or fallback to Pikachu
+  const params = new URLSearchParams(window.location.search);
+  const initial = params.get('pokemon') || 'pikachu';
+  setActiveTab('details');
+  handleSearch(initial);
+})();
+
