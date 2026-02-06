@@ -1,6 +1,7 @@
 (() => {
   const API_BASE = 'https://pokeapi.co/api/v2/pokemon/';
   const MAX_ID = 1025; // Updated National Dex count
+  const FAVORITES_KEY = 'pokedex-favorites';
 
   const form = document.getElementById('search-form');
   const input = document.getElementById('search-input');
@@ -37,9 +38,14 @@
   const effWeakEl = document.getElementById('eff-weak');
   const effResistEl = document.getElementById('eff-resist');
   const effImmuneEl = document.getElementById('eff-immune');
+  const favoriteBtn = document.getElementById('favorite-btn');
+  const cryBtn = document.getElementById('cry-btn');
+  const funFactsEl = document.getElementById('fun-facts');
 
   let currentId = null;
   let currentName = null;
+  let favorites = new Set();
+  let cryAudio = null;
   const abilityCache = new Map();
   const locationCache = new Map();
   const typeCache = new Map();
@@ -117,6 +123,46 @@
 
   function spriteUrl(id) {
     return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+  }
+
+  function parseStorage(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function saveStorage(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function loadFavorites() {
+    const list = parseStorage(FAVORITES_KEY, []);
+    favorites = new Set(Array.isArray(list) ? list : []);
+  }
+
+  function saveFavorites() {
+    saveStorage(FAVORITES_KEY, Array.from(favorites));
+  }
+
+  function updateFavoriteButton(name) {
+    if (!favoriteBtn) return;
+    const active = favorites.has(name);
+    favoriteBtn.textContent = active ? 'Favourited ⭐' : 'Favourite ☆';
+    favoriteBtn.classList.toggle('is-active', active);
+  }
+
+  function toggleFavorite(name) {
+    if (favorites.has(name)) {
+      favorites.delete(name);
+    } else {
+      favorites.add(name);
+    }
+    saveFavorites();
+    updateFavoriteButton(name);
   }
 
   function formatGender(genderRate) {
@@ -213,6 +259,7 @@
     const bioEl = document.getElementById('biology');
     if (bioEl) bioEl.textContent = bio || '—';
 
+    updateFavoriteButton(name);
     card.hidden = false;
   }
 
@@ -378,24 +425,15 @@
 
     await walk(chain.chain, [], null, true);
 
-    if (currentPokemonName) {
-      const target = currentPokemonName.toLowerCase();
-      const filtered = paths
-        .map(path => {
-          const idx = path.findIndex(node => node.name.toLowerCase() === target);
-          return idx === -1 ? null : path.slice(idx);
-        })
-        .filter(Boolean);
-      if (filtered.length) return filtered;
-    }
-
     return paths;
   }
 
-  function renderEvolution(paths, currentPokemon) {
+  function renderEvolution(paths, currentPokemon, specialForms = []) {
     if (!evolutionContainer) return;
     evolutionContainer.innerHTML = '';
-    if (!paths.length) {
+    const hasPaths = paths.length > 0;
+    const hasSpecial = specialForms.length > 0;
+    if (!hasPaths && !hasSpecial) {
       const empty = document.createElement('p');
       empty.className = 'subtitle';
       empty.textContent = 'No evolution data.';
@@ -405,59 +443,97 @@
 
     const frag = document.createDocumentFragment();
 
-    paths.forEach(path => {
-      const row = document.createElement('div');
-      row.className = 'evo-path';
+    if (hasPaths) {
+      paths.forEach(path => {
+        const row = document.createElement('div');
+        row.className = 'evo-path';
 
-      path.forEach((node, idx) => {
+        path.forEach((node, idx) => {
+          const card = document.createElement('a');
+          card.className = 'evo-node';
+          card.href = `index.html?pokemon=${encodeURIComponent(node.name)}`;
+
+          const isCurrent =
+            currentPokemon &&
+            (node.name.toLowerCase() === currentPokemon.name?.toLowerCase() ||
+              (node.name.toLowerCase() === currentPokemon.species?.name?.toLowerCase() &&
+                currentPokemon.name?.includes('-')));
+          const displayName = isCurrent ? currentPokemon.name : node.name;
+          const displayId = isCurrent ? currentPokemon.id : node.id;
+          if (isCurrent) card.classList.add('evo-node--current');
+
+          const img = document.createElement('img');
+          img.src =
+            (isCurrent
+              ? currentPokemon.sprites?.other?.['official-artwork']?.front_default ||
+                currentPokemon.sprites?.front_default
+              : null) || spriteUrl(displayId);
+          img.alt = displayName;
+          img.loading = 'lazy';
+
+          const name = document.createElement('p');
+          name.className = 'mini-card__name';
+          name.textContent = displayName;
+
+          const idTag = document.createElement('p');
+          idTag.className = 'eyebrow';
+          idTag.textContent = `#${String(displayId ?? '').padStart(3, '0')}`;
+
+          card.append(img, name, idTag);
+          row.appendChild(card);
+
+          const next = path[idx + 1];
+          if (next) {
+            const arrowWrap = document.createElement('div');
+            arrowWrap.className = 'evo-arrow';
+            const method = document.createElement('p');
+            method.className = 'evo-method';
+            method.textContent = next.method || 'Evolves';
+            const arrow = document.createElement('span');
+            arrow.textContent = '→';
+            arrowWrap.append(method, arrow);
+            row.appendChild(arrowWrap);
+          }
+        });
+
+        frag.appendChild(row);
+      });
+    }
+
+    if (hasSpecial) {
+      const section = document.createElement('div');
+      section.className = 'evo-special';
+      const title = document.createElement('p');
+      title.className = 'label';
+      title.textContent = 'Special Evolutions';
+      const grid = document.createElement('div');
+      grid.className = 'evo-special__grid';
+
+      specialForms.forEach(form => {
         const card = document.createElement('a');
         card.className = 'evo-node';
-        card.href = `index.html?pokemon=${encodeURIComponent(node.name)}`;
-
-        const isCurrent =
-          currentPokemon &&
-          (node.name.toLowerCase() === currentPokemon.name?.toLowerCase() ||
-            (node.name.toLowerCase() === currentPokemon.species?.name?.toLowerCase() &&
-              currentPokemon.name?.includes('-')));
-        const displayName = isCurrent ? currentPokemon.name : node.name;
-        const displayId = isCurrent ? currentPokemon.id : node.id;
+        card.href = `index.html?pokemon=${encodeURIComponent(form.name)}`;
 
         const img = document.createElement('img');
-        img.src =
-          (isCurrent
-            ? currentPokemon.sprites?.other?.['official-artwork']?.front_default ||
-              currentPokemon.sprites?.front_default
-            : null) || spriteUrl(displayId);
-        img.alt = displayName;
+        img.src = spriteUrl(form.id);
+        img.alt = form.name;
         img.loading = 'lazy';
 
         const name = document.createElement('p');
         name.className = 'mini-card__name';
-        name.textContent = displayName;
+        name.textContent = form.label;
 
         const idTag = document.createElement('p');
         idTag.className = 'eyebrow';
-        idTag.textContent = `#${String(displayId ?? '').padStart(3, '0')}`;
+        idTag.textContent = `#${String(form.id ?? '').padStart(3, '0')}`;
 
         card.append(img, name, idTag);
-        row.appendChild(card);
-
-        const next = path[idx + 1];
-        if (next) {
-          const arrowWrap = document.createElement('div');
-          arrowWrap.className = 'evo-arrow';
-          const method = document.createElement('p');
-          method.className = 'evo-method';
-          method.textContent = next.method || 'Evolves';
-          const arrow = document.createElement('span');
-          arrow.textContent = '→';
-          arrowWrap.append(method, arrow);
-          row.appendChild(arrowWrap);
-        }
+        grid.appendChild(card);
       });
 
-      frag.appendChild(row);
-    });
+      section.append(title, grid);
+      frag.appendChild(section);
+    }
 
     evolutionContainer.appendChild(frag);
   }
@@ -493,6 +569,92 @@
 
   function cleanName(text) {
     return text?.replace(/-/g, ' ') ?? '';
+  }
+
+  function titleCase(text) {
+    return String(text || '')
+      .split(' ')
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  }
+
+  function isSpecialEvolution(name) {
+    return name.includes('-mega') || name.includes('-gmax');
+  }
+
+  function specialEvolutionLabel(name) {
+    const base = cleanName(name);
+    return titleCase(base.replace('gmax', 'Gigantamax').replace('mega', 'Mega'));
+  }
+
+  function parseIdFromUrl(url) {
+    if (!url) return null;
+    const parts = url.split('/').filter(Boolean);
+    const id = Number(parts[parts.length - 1]);
+    return Number.isFinite(id) ? id : null;
+  }
+
+  function formatHeightWeight(height, weight) {
+    const meters = (height / 10) || 0;
+    const inches = meters * 39.3701;
+    const feet = Math.floor(inches / 12);
+    const remInches = Math.round(inches % 12);
+    const kg = (weight / 10) || 0;
+    const lbs = kg * 2.20462;
+    return {
+      height: `${meters.toFixed(1)} m (${feet}'${remInches}")`,
+      weight: `${kg.toFixed(1)} kg (${lbs.toFixed(1)} lb)`
+    };
+  }
+
+  function renderFunFacts(pokemon, species) {
+    if (!funFactsEl) return;
+    funFactsEl.innerHTML = '';
+    if (!pokemon || !species) {
+      const empty = document.createElement('li');
+      empty.className = 'move-meta';
+      empty.textContent = '—';
+      funFactsEl.appendChild(empty);
+      return;
+    }
+
+    const facts = [];
+    const pretty = value => cleanName(value || 'Unknown');
+    const { height, weight } = formatHeightWeight(pokemon.height, pokemon.weight);
+    facts.push(`Height: ${height}`);
+    facts.push(`Weight: ${weight}`);
+    facts.push(`Color: ${pretty(species.color?.name)}`);
+    facts.push(`Shape: ${pretty(species.shape?.name)}`);
+    facts.push(`Growth: ${pretty(species.growth_rate?.name)}`);
+    facts.push(`Generation: ${pretty(species.generation?.name)}`);
+    facts.push(`Capture rate: ${species.capture_rate ?? '—'}`);
+    facts.push(`Base friendship: ${species.base_happiness ?? '—'}`);
+    facts.push(`Egg cycles: ${species.hatch_counter ?? '—'}`);
+    if (species.is_legendary) facts.push('Legendary');
+    if (species.is_mythical) facts.push('Mythical');
+    if (species.is_baby) facts.push('Baby Pokémon');
+
+    facts.forEach(fact => {
+      const li = document.createElement('li');
+      li.className = 'chip';
+      li.textContent = fact;
+      funFactsEl.appendChild(li);
+    });
+  }
+
+  function setupCry(pokemon) {
+    if (!cryBtn) return;
+    const cryUrl = pokemon?.cries?.latest || pokemon?.cries?.legacy;
+    if (!cryUrl) {
+      cryBtn.disabled = true;
+      cryBtn.textContent = 'No Cry';
+      cryAudio = null;
+      return;
+    }
+    cryBtn.disabled = false;
+    cryBtn.textContent = 'Play Cry';
+    cryAudio = new Audio(cryUrl);
   }
 
   function deepGet(obj, path) {
@@ -536,6 +698,7 @@
 
     galleryEl.appendChild(frag);
   }
+
 
   function renderMoves({ level = [], machine = [], egg = [] }) {
     const fillList = (el, items, formatter) => {
@@ -798,10 +961,21 @@
       const flavorText = flavorEntries[0]?.flavor_text?.replace(/\s+/g, ' ') || '';
       const biologyText = flavorEntries[1]?.flavor_text?.replace(/\s+/g, ' ') || flavorText;
       const genusText = (species.genera || []).find(g => g.language?.name === 'en')?.genus || '';
-      renderForms(species.varieties || [], pokemon.name);
+      const varieties = species.varieties || [];
+      renderForms(varieties, pokemon.name);
+      const specialForms = varieties
+        .filter(v => !v.is_default && isSpecialEvolution(v.pokemon?.name || ''))
+        .map(v => ({
+          name: v.pokemon.name,
+          id: parseIdFromUrl(v.pokemon.url),
+          label: specialEvolutionLabel(v.pokemon.name)
+        }))
+        .filter(form => form.id);
       renderCard(pokemon, abilityDetails, genderText, eggGroups, habitatText, locationsText, versionsText, flavorText, genusText, biologyText);
+      renderFunFacts(pokemon, species);
+      setupCry(pokemon);
       const evoChain = await fetchEvolutionChainFromSpecies(species, pokemon.name);
-      renderEvolution(evoChain, pokemon);
+      renderEvolution(evoChain, pokemon, specialForms);
       const moves = await groupMoves(pokemon.moves || []);
       renderMoves(moves);
       renderGallery(pokemon.sprites || {});
@@ -812,6 +986,7 @@
       setStatus(err.message || 'Something went wrong.', 'error');
       card.hidden = true;
       if (evolutionContainer) evolutionContainer.innerHTML = '';
+      renderFunFacts(null, null);
       renderMoves({ level: [], machine: [], egg: [] });
       renderGallery({});
       renderEffectiveness({ weak: [], resist: [], immune: [] });
@@ -854,9 +1029,21 @@
     handleSearch(id);
   });
 
+  favoriteBtn?.addEventListener('click', () => {
+    if (currentName) toggleFavorite(currentName);
+  });
+
+  cryBtn?.addEventListener('click', () => {
+    if (cryAudio) {
+      cryAudio.currentTime = 0;
+      cryAudio.play();
+    }
+  });
+
   // Load initial Pokémon from query param or fallback to Pikachu
   const params = new URLSearchParams(window.location.search);
   const initial = params.get('pokemon') || 'pikachu';
+  loadFavorites();
   setActiveTab('details');
   handleSearch(initial);
 })();

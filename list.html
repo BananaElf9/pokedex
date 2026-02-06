@@ -31,9 +31,31 @@
           <option value="type">Type</option>
         </select>
       </div>
+      <div class="toolbar__left">
+        <label class="label" for="gen-select">Generation</label>
+        <select id="gen-select">
+          <option value="all">All</option>
+          <option value="1">Gen 1</option>
+          <option value="2">Gen 2</option>
+          <option value="3">Gen 3</option>
+          <option value="4">Gen 4</option>
+          <option value="5">Gen 5</option>
+          <option value="6">Gen 6</option>
+          <option value="7">Gen 7</option>
+          <option value="8">Gen 8</option>
+          <option value="9">Gen 9</option>
+        </select>
+      </div>
       <div class="toolbar__search">
         <label class="sr-only" for="search-list">Search by name or ID</label>
         <input id="search-list" type="text" placeholder="Search name or ID..." autocomplete="off" />
+      </div>
+      <div class="toolbar__actions">
+        <label class="filter-pill filter-pill--toggle" for="favorites-only">
+          <input id="favorites-only" type="checkbox" />
+          <span>Favorites only</span>
+        </label>
+        <button id="random-list" class="ghost-btn" type="button">Random</button>
       </div>
       <div id="load-status" class="status" role="status" aria-live="polite">Loading list…</div>
     </section>
@@ -41,6 +63,45 @@
     <section class="filters">
       <p class="label">Filter by type</p>
       <div id="type-filters" class="filters__grid" role="group" aria-label="Filter by type"></div>
+    </section>
+
+    <section class="filters">
+      <p class="label">Filter by form</p>
+      <div id="form-filters" class="filters__grid" role="group" aria-label="Filter by form"></div>
+    </section>
+
+    <section class="panel-grid">
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Team Builder</h2>
+          <p class="subtitle">Pick up to 6 Pokémon and see type coverage.</p>
+        </div>
+        <div id="team-slots" class="team-slots"></div>
+        <div class="team-actions">
+          <button id="clear-team" class="ghost-btn" type="button">Clear team</button>
+        </div>
+        <div>
+          <p class="label">Type Coverage</p>
+          <div id="team-coverage" class="chips"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel__header">
+          <h2>Quiz Mode</h2>
+          <p class="subtitle">Guess the Pokémon from the silhouette.</p>
+        </div>
+        <div class="quiz">
+          <img id="quiz-image" class="quiz__image" alt="Quiz silhouette" />
+          <div class="quiz__controls">
+            <input id="quiz-input" type="text" placeholder="Type the name..." autocomplete="off" />
+            <button id="quiz-check" type="button">Check</button>
+            <button id="quiz-reveal" class="ghost-btn" type="button">Reveal</button>
+            <button id="quiz-next" class="ghost-btn" type="button">Next</button>
+          </div>
+          <p id="quiz-status" class="status">Press Next to start!</p>
+        </div>
+      </div>
     </section>
 
     <main class="grid" id="pokemon-grid" aria-live="polite"></main>

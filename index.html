@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pokedex</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    if (!window.location.search) {
+      window.location.replace('list.html');
+    }
+  </script>
 </head>
 <body>
   <div class="page">
@@ -13,8 +18,8 @@
         <div class="pokeball" aria-hidden="true"></div>
         <div>
           <p class="eyebrow">Pokédex</p>
-          <h1>Micah's Pokédex</h1>
-          <p class="subtitle">Powered by Micah and Daddy</p>
+          <h1>Micah+Isla's Pokédex</h1>
+          <p class="subtitle">Powered by Daddy</p>
         </div>
       </a>
       <nav class="nav-links">
@@ -46,6 +51,10 @@
           <div class="card__title">
             <p class="eyebrow" id="poke-id">#000</p>
             <h2 id="poke-name">Pokemon</h2>
+            <div class="title-actions">
+              <button id="favorite-btn" class="ghost-btn" type="button">Favorite</button>
+              <button id="cry-btn" class="ghost-btn" type="button">Play Cry</button>
+            </div>
             <p id="genus" class="genus">—</p>
             <p id="flavor" class="flavor">—</p>
             <p id="biology" class="flavor">—</p>
@@ -106,6 +115,11 @@
               <p class="value badge" id="bst">Base Stat Total: —</p>
             </div>
             <ul id="stats" class="stats"></ul>
+          </div>
+
+          <div>
+            <p class="label">Fun Facts</p>
+            <ul id="fun-facts" class="chips"></ul>
           </div>
 
         </div>
