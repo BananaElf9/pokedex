@@ -273,9 +273,16 @@
     }
     if (flavorEl) flavorEl.textContent = flavorText || '—';
     if (genusEl) genusEl.textContent = genusText || '—';
-    const bio = biologyText || flavorText;
     const bioEl = document.getElementById('biology');
-    if (bioEl) bioEl.textContent = bio || '—';
+    if (bioEl) {
+      if (biologyText) {
+        bioEl.hidden = false;
+        bioEl.textContent = biologyText;
+      } else {
+        bioEl.hidden = true;
+        bioEl.textContent = '';
+      }
+    }
 
     updateFavoriteButton(name);
     card.hidden = false;
@@ -1204,7 +1211,8 @@
         pokemon.game_indices?.map(g => cleanName(g.version?.name)).filter(Boolean).join(', ') || '—';
       const flavorEntries = (species.flavor_text_entries || []).filter(e => e.language?.name === 'en');
       const flavorText = flavorEntries[0]?.flavor_text?.replace(/\s+/g, ' ') || '';
-      const biologyText = flavorEntries[1]?.flavor_text?.replace(/\s+/g, ' ') || flavorText;
+      const biologyTextRaw = flavorEntries[1]?.flavor_text?.replace(/\s+/g, ' ') || '';
+      const biologyText = biologyTextRaw && biologyTextRaw !== flavorText ? biologyTextRaw : '';
       const genusText = (species.genera || []).find(g => g.language?.name === 'en')?.genus || '';
       const genName = species.generation?.name || '';
       if (generationEl) generationEl.textContent = generationLabel(genName);
