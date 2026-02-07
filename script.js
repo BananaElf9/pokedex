@@ -14,6 +14,9 @@
   const tabs = document.querySelectorAll('.tab');
   const tabPanels = document.querySelectorAll('.tab-panel');
   const evolutionContainer = document.getElementById('evolution-container');
+  const evolutionTitle = document.getElementById('evolution-title');
+  const evolutionSubtitle = document.getElementById('evolution-subtitle');
+  const altFormsSection = document.getElementById('alt-forms-section');
   const statusEl = document.getElementById('status');
   const loadingPanel = document.getElementById('loading-panel');
   const card = document.getElementById('card');
@@ -631,9 +634,55 @@
     return buildTree(chain.chain, null, true);
   }
 
-  function renderEvolution(tree, currentPokemon) {
+  function renderEvolution(tree, currentPokemon, originalForm = null) {
     if (!evolutionContainer) return;
     evolutionContainer.innerHTML = '';
+    if (evolutionTitle) evolutionTitle.textContent = originalForm ? 'Original Form' : 'Evolution';
+    if (evolutionSubtitle) {
+      evolutionSubtitle.hidden = Boolean(originalForm);
+    }
+    if (altFormsSection) {
+      altFormsSection.hidden = Boolean(originalForm);
+    }
+    if (originalForm) {
+      const section = document.createElement('div');
+      section.className = 'evo-special';
+      const grid = document.createElement('div');
+      grid.className = 'evo-special__grid';
+
+      const card = document.createElement('a');
+      card.className = 'evo-node';
+      card.href = `index.html?pokemon=${encodeURIComponent(originalForm.name)}`;
+
+      const img = document.createElement('img');
+      img.src = spriteUrl(originalForm.id);
+      img.alt = originalForm.name;
+      img.loading = 'lazy';
+
+      const name = document.createElement('p');
+      name.className = 'mini-card__name';
+      name.textContent = formatPokemonName(originalForm.name);
+
+      const idTag = document.createElement('p');
+      idTag.className = 'eyebrow';
+      idTag.textContent = `#${String(originalForm.id ?? '').padStart(3, '0')}`;
+
+      const types = document.createElement('div');
+      types.className = 'evo-node__types';
+      (originalForm.types || []).forEach(type => {
+        const pill = document.createElement('span');
+        pill.className = 'type-pill small';
+        pill.textContent = type;
+        pill.style.background = typeColors[type] || '#e2e8f0';
+        types.appendChild(pill);
+      });
+
+      card.append(img, name, idTag, types);
+      grid.appendChild(card);
+      section.append(grid);
+      evolutionContainer.appendChild(section);
+      return;
+    }
     const hasTree = Boolean(tree);
     if (!hasTree) {
       const empty = document.createElement('p');
@@ -1550,7 +1599,24 @@
       setupCry(pokemon);
       setupVoice(pokemon, genusText, flavorText, regionText);
       const evoChain = await fetchEvolutionChainFromSpecies(species, pokemon.name);
-      renderEvolution(evoChain, pokemon);
+      let originalForm = null;
+      if (pokemon.name && /-(gmax|mega)/i.test(pokemon.name)) {
+        try {
+          const base = await fetchPokemon(species.name);
+          originalForm = {
+            name: base.name,
+            id: base.id,
+            types: base.types?.map(t => t.type.name) || []
+          };
+        } catch (err) {
+          originalForm = {
+            name: species.name,
+            id: species.id,
+            types: []
+          };
+        }
+      }
+      renderEvolution(evoChain, pokemon, originalForm);
       const moves = await groupMoves(pokemon.moves || []);
       renderMoves(moves);
       renderGallery(pokemon.sprites || {}, pokemon.name);
