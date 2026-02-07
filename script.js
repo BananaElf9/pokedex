@@ -234,7 +234,7 @@
     });
   }
 
-  function renderCard(data, abilityDetails, genderText, eggGroupsText, habitatText, locationsText, versionsText, flavorText, genusText, biologyText) {
+  function renderCard(data, abilityDetails, genderText, eggGroupsText, habitatText, versionsText, flavorText, genusText, biologyText) {
     const { id, name, sprites, types, height, weight, base_experience, abilities, stats } = data;
     currentId = id;
     currentName = name;
@@ -255,8 +255,22 @@
     }
     if (eggEl) eggEl.textContent = eggGroupsText ?? '—';
     if (habitatEl) habitatEl.textContent = habitatText ?? '—';
-    if (locationsEl) locationsEl.textContent = locationsText ?? '—';
-    if (versionsEl) versionsEl.textContent = versionsText ?? '—';
+    if (versionsEl) {
+      versionsEl.innerHTML = '';
+      if (!versionsText || versionsText === '—') {
+        const li = document.createElement('li');
+        li.className = 'move-meta';
+        li.textContent = '—';
+        versionsEl.appendChild(li);
+      } else {
+        versionsText.split(', ').forEach(version => {
+          const li = document.createElement('li');
+          li.className = 'version-chip';
+          li.textContent = version;
+          versionsEl.appendChild(li);
+        });
+      }
+    }
     if (flavorEl) flavorEl.textContent = flavorText || '—';
     if (genusEl) genusEl.textContent = genusText || '—';
     const bio = biologyText || flavorText;
@@ -397,47 +411,56 @@
 
   async function fetchEvolutionChainFromSpecies(species, currentPokemonName = null) {
     const chainUrl = species?.evolution_chain?.url;
-    if (!chainUrl) return [];
+    if (!chainUrl) return null;
 
     const chainRes = await fetch(chainUrl);
     if (!chainRes.ok) throw new Error('Failed to load evolution chain.');
     const chain = await chainRes.json();
 
-    const paths = [];
-    async function walk(node, pathSoFar = [], methodText = null, isRoot = false) {
-      if (!node) return;
+    async function buildTree(node, methodText = null, isRoot = false) {
+      if (!node) return null;
       const speciesName = node.species.name;
       const pokemonData = await resolvePokemonFromSpecies(
         speciesName,
         isRoot ? currentPokemonName : null
       );
-      const nextPath = [...pathSoFar, { name: pokemonData.name, id: pokemonData.id, method: methodText }];
-
-      if (!node.evolves_to || node.evolves_to.length === 0) {
-        paths.push(nextPath);
-        return;
+      let types = [];
+      try {
+        if (pokemonData?.name) {
+          const res = await fetch(`${API_BASE}${encodeURIComponent(pokemonData.name)}`);
+          if (res.ok) {
+            const data = await res.json();
+            types = data.types?.map(t => t.type.name) || [];
+          }
+        }
+      } catch (err) {
+        types = [];
       }
-
-      await Promise.all(
-        node.evolves_to.map(async next => {
+      const children = await Promise.all(
+        (node.evolves_to || []).map(async next => {
           const detail = next.evolution_details?.[0];
           const text = evolutionMethodText(detail);
-          await walk(next, nextPath, text, false);
+          return buildTree(next, text, false);
         })
       );
+      return {
+        name: pokemonData.name,
+        id: pokemonData.id,
+        method: methodText,
+        types,
+        children: children.filter(Boolean)
+      };
     }
 
-    await walk(chain.chain, [], null, true);
-
-    return paths;
+    return buildTree(chain.chain, null, true);
   }
 
-  function renderEvolution(paths, currentPokemon, specialForms = []) {
+  function renderEvolution(tree, currentPokemon, specialForms = []) {
     if (!evolutionContainer) return;
     evolutionContainer.innerHTML = '';
-    const hasPaths = paths.length > 0;
+    const hasTree = Boolean(tree);
     const hasSpecial = specialForms.length > 0;
-    if (!hasPaths && !hasSpecial) {
+    if (!hasTree && !hasSpecial) {
       const empty = document.createElement('p');
       empty.className = 'subtitle';
       empty.textContent = 'No evolution data.';
@@ -447,61 +470,115 @@
 
     const frag = document.createDocumentFragment();
 
-    if (hasPaths) {
-      paths.forEach(path => {
-        const row = document.createElement('div');
-        row.className = 'evo-path';
+    const buildCard = node => {
+      const card = document.createElement('a');
+      card.className = 'evo-node';
+      card.href = `index.html?pokemon=${encodeURIComponent(node.name)}`;
 
-        path.forEach((node, idx) => {
-          const card = document.createElement('a');
-          card.className = 'evo-node';
-          card.href = `index.html?pokemon=${encodeURIComponent(node.name)}`;
+      const isCurrent =
+        currentPokemon &&
+        (node.name.toLowerCase() === currentPokemon.name?.toLowerCase() ||
+          (node.name.toLowerCase() === currentPokemon.species?.name?.toLowerCase() &&
+            currentPokemon.name?.includes('-')));
+      const displayName = isCurrent ? currentPokemon.name : node.name;
+      const displayId = isCurrent ? currentPokemon.id : node.id;
+      if (isCurrent) card.classList.add('evo-node--current');
 
-          const isCurrent =
-            currentPokemon &&
-            (node.name.toLowerCase() === currentPokemon.name?.toLowerCase() ||
-              (node.name.toLowerCase() === currentPokemon.species?.name?.toLowerCase() &&
-                currentPokemon.name?.includes('-')));
-          const displayName = isCurrent ? currentPokemon.name : node.name;
-          const displayId = isCurrent ? currentPokemon.id : node.id;
-          if (isCurrent) card.classList.add('evo-node--current');
+      const img = document.createElement('img');
+      img.src =
+        (isCurrent
+          ? currentPokemon.sprites?.other?.['official-artwork']?.front_default ||
+            currentPokemon.sprites?.front_default
+          : null) || spriteUrl(displayId);
+      img.alt = displayName;
+      img.loading = 'lazy';
 
-          const img = document.createElement('img');
-          img.src =
-            (isCurrent
-              ? currentPokemon.sprites?.other?.['official-artwork']?.front_default ||
-                currentPokemon.sprites?.front_default
-              : null) || spriteUrl(displayId);
-          img.alt = displayName;
-          img.loading = 'lazy';
+      const name = document.createElement('p');
+      name.className = 'mini-card__name';
+      name.textContent = displayName;
 
-          const name = document.createElement('p');
-          name.className = 'mini-card__name';
-          name.textContent = displayName;
+      if (isCurrent) {
+        const currentTag = document.createElement('span');
+        currentTag.className = 'evo-current-tag';
+        currentTag.textContent = 'Current';
+        name.appendChild(currentTag);
+      }
 
-          const idTag = document.createElement('p');
-          idTag.className = 'eyebrow';
-          idTag.textContent = `#${String(displayId ?? '').padStart(3, '0')}`;
-
-          card.append(img, name, idTag);
-          row.appendChild(card);
-
-          const next = path[idx + 1];
-          if (next) {
-            const arrowWrap = document.createElement('div');
-            arrowWrap.className = 'evo-arrow';
-            const method = document.createElement('p');
-            method.className = 'evo-method';
-            method.textContent = next.method || 'Evolves';
-            const arrow = document.createElement('span');
-            arrow.textContent = '→';
-            arrowWrap.append(method, arrow);
-            row.appendChild(arrowWrap);
-          }
-        });
-
-        frag.appendChild(row);
+      const types = document.createElement('div');
+      types.className = 'evo-node__types';
+      (node.types || []).forEach(type => {
+        const pill = document.createElement('span');
+        pill.className = 'type-pill small';
+        pill.textContent = type;
+        pill.style.background = typeColors[type] || '#e2e8f0';
+        types.appendChild(pill);
       });
+
+      const idTag = document.createElement('p');
+      idTag.className = 'eyebrow';
+      idTag.textContent = `#${String(displayId ?? '').padStart(3, '0')}`;
+
+      card.append(img, name, idTag, types);
+      return card;
+    };
+
+    const methodBadge = method => {
+      const text = method || 'Evolves';
+      const lower = text.toLowerCase();
+      const badges = [];
+      if (lower.includes('use ')) badges.push('Stone');
+      if (lower.includes('friend') || lower.includes('affection')) badges.push('Friendship');
+      if (lower.includes('day')) badges.push('Day');
+      if (lower.includes('night')) badges.push('Night');
+      if (lower.includes('trade')) badges.push('Trade');
+      if (lower.includes('level')) badges.push('Level');
+      if (!badges.length) return null;
+      const wrap = document.createElement('div');
+      wrap.className = 'evo-branch__badges';
+      badges.forEach(label => {
+        const chip = document.createElement('span');
+        chip.className = 'evo-badge';
+        chip.textContent = label;
+        wrap.appendChild(chip);
+      });
+      return wrap;
+    };
+
+    const buildBranch = node => {
+      const branch = document.createElement('div');
+      branch.className = 'evo-branch';
+      branch.appendChild(buildCard(node));
+
+      if (node.children && node.children.length) {
+        const childrenWrap = document.createElement('div');
+        childrenWrap.className = 'evo-branch__children';
+        node.children.forEach(child => {
+          const childRow = document.createElement('div');
+          childRow.className = 'evo-branch__child';
+
+          const methodWrap = document.createElement('div');
+          methodWrap.className = 'evo-branch__method';
+          const arrow = document.createElement('span');
+          arrow.className = 'evo-branch__arrow';
+          arrow.textContent = '→';
+          const text = document.createElement('span');
+          text.className = 'evo-branch__text';
+          text.textContent = child.method || 'Evolves';
+          methodWrap.append(arrow, text);
+          const badges = methodBadge(child.method);
+          if (badges) methodWrap.appendChild(badges);
+
+          childRow.append(methodWrap, buildBranch(child));
+          childrenWrap.appendChild(childRow);
+        });
+        branch.appendChild(childrenWrap);
+      }
+
+      return branch;
+    };
+
+    if (hasTree) {
+      frag.appendChild(buildBranch(tree));
     }
 
     if (hasSpecial) {
@@ -1059,13 +1136,57 @@
       const res = await fetch(url);
       if (!res.ok) throw new Error('bad locations');
       const data = await res.json();
-      const names = [...new Set(data.map(loc => cleanName(loc.location_area?.name)))].filter(Boolean);
-      const trimmed = names.slice(0, 10);
-      locationCache.set(url, trimmed);
-      return trimmed;
+      const versionMap = new Map();
+      data.forEach(entry => {
+        const area = cleanName(entry.location_area?.name);
+        if (!area) return;
+        (entry.version_details || []).forEach(detail => {
+          const version = cleanName(detail.version?.name);
+          if (!version) return;
+          const set = versionMap.get(version) || new Set();
+          set.add(area);
+          versionMap.set(version, set);
+        });
+      });
+
+      const formatted = Array.from(versionMap.entries()).map(([version, areas]) => ({
+        version,
+        areas: Array.from(areas)
+      }));
+
+      locationCache.set(url, formatted);
+      return formatted;
     } catch (err) {
       return [];
     }
+  }
+
+  function renderLocations(list) {
+    if (!locationsEl) return;
+    locationsEl.innerHTML = '';
+    if (!list?.length) {
+      const li = document.createElement('li');
+      li.className = 'move-meta';
+      li.textContent = '—';
+      locationsEl.appendChild(li);
+      return;
+    }
+
+    list.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'location-row';
+      const label = document.createElement('span');
+      label.className = 'location-game';
+      label.textContent = item.version;
+      const areas = document.createElement('span');
+      areas.className = 'location-areas';
+      const maxAreas = 4;
+      const trimmed = item.areas.slice(0, maxAreas);
+      const remaining = item.areas.length - trimmed.length;
+      areas.textContent = trimmed.join(', ') + (remaining > 0 ? ` +${remaining} more` : '');
+      li.append(label, areas);
+      locationsEl.appendChild(li);
+    });
   }
 
   async function handleSearch(query) {
@@ -1079,7 +1200,6 @@
       const eggGroups = species.egg_groups?.map(g => cleanName(g.name)).join(', ') || '—';
       const habitatText = cleanName(species.habitat?.name) || 'Unknown';
       const locationsList = await fetchLocations(pokemon.location_area_encounters);
-      const locationsText = locationsList.length ? locationsList.join(', ') : '—';
       const versionsText =
         pokemon.game_indices?.map(g => cleanName(g.version?.name)).filter(Boolean).join(', ') || '—';
       const flavorEntries = (species.flavor_text_entries || []).filter(e => e.language?.name === 'en');
@@ -1099,7 +1219,8 @@
           label: specialEvolutionLabel(v.pokemon.name)
         }))
         .filter(form => form.id);
-      renderCard(pokemon, abilityDetails, genderText, eggGroups, habitatText, locationsText, versionsText, flavorText, genusText, biologyText);
+      renderCard(pokemon, abilityDetails, genderText, eggGroups, habitatText, versionsText, flavorText, genusText, biologyText);
+      renderLocations(locationsList);
       renderFunFacts(pokemon, species);
       setupCry(pokemon);
       const evoChain = await fetchEvolutionChainFromSpecies(species, pokemon.name);
@@ -1120,6 +1241,7 @@
       if (generationEl) generationEl.textContent = '—';
       if (regionEl) regionEl.textContent = '—';
       if (formsGalleryEl) formsGalleryEl.innerHTML = '';
+      renderLocations([]);
       renderFunFacts(null, null);
       renderMoves({ level: [], machine: [], egg: [] });
       renderGallery({});

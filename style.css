@@ -640,6 +640,53 @@ h1 {
   font-weight: 700;
 }
 
+.locations-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.location-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.location-game {
+  font-weight: 700;
+  color: var(--text);
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.location-areas {
+  color: var(--muted);
+}
+
+.versions-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.version-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
 .card__body {
   display: grid;
   grid-template-columns: repeat(3, minmax(200px, 1fr));
@@ -691,6 +738,26 @@ h1 {
   transition: transform 120ms ease, box-shadow 120ms ease, border 120ms ease;
 }
 
+.evo-node__types {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.evo-current-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(249, 115, 22, 0.18);
+  font-size: 10px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .evo-node--current {
   border-color: var(--accent);
   box-shadow: 0 14px 28px rgba(249, 115, 22, 0.2);
@@ -727,6 +794,57 @@ h1 {
   color: var(--muted);
   text-align: center;
   max-width: 120px;
+}
+
+.evo-branch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.evo-branch__children {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.evo-branch__child {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.evo-branch__method {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  max-width: 160px;
+  flex-wrap: wrap;
+}
+
+.evo-branch__arrow {
+  font-weight: 700;
+}
+
+.evo-branch__badges {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.evo-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .evo-special {
@@ -951,6 +1069,16 @@ h1 {
 
   .chips {
     flex-wrap: wrap;
+  }
+
+  .evo-branch {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .evo-branch__child {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
