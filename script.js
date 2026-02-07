@@ -57,6 +57,8 @@
     { label: 'Official', path: ['other', 'official-artwork', 'front_default'] },
     { label: 'Official Shiny', path: ['other', 'official-artwork', 'front_shiny'] },
     { label: 'Dream World', path: ['other', 'dream-world', 'front_default'] },
+    { label: 'Animated', path: ['versions', 'generation-v', 'black-white', 'animated', 'front_default'] },
+    { label: 'Animated Shiny', path: ['versions', 'generation-v', 'black-white', 'animated', 'front_shiny'] },
     { label: 'Default', path: ['front_default'] },
     { label: 'Shiny', path: ['front_shiny'] },
     { label: 'Female', path: ['front_female'] },
