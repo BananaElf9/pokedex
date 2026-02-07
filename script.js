@@ -689,19 +689,19 @@
       }
     })();
     if (!canPlayOgg) {
-      cryBtn.disabled = true;
-      cryBtn.textContent = 'Cry not supported';
+    cryBtn.disabled = true;
+    cryBtn.textContent = '🔊 Cry not supported';
       cryAudio = null;
       return;
     }
     if (!cryUrl) {
       cryBtn.disabled = true;
-      cryBtn.textContent = 'No Cry';
+      cryBtn.textContent = '🔊 No Cry';
       cryAudio = null;
       return;
     }
     cryBtn.disabled = false;
-    cryBtn.textContent = 'Play Cry';
+    cryBtn.textContent = '🔊 Play Cry';
     cryAudio = new Audio(cryUrl);
   }
 
