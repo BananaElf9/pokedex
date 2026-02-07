@@ -14,16 +14,20 @@
 <body>
   <div class="page">
     <header class="hero">
-      <a class="title-group" href="list.html" aria-label="View all Pokémon">
-        <div class="pokeball" aria-hidden="true"></div>
+      <div class="title-group">
+        <a class="pokeball-link" href="list.html" aria-label="Back to home">
+          <div class="pokeball" aria-hidden="true"></div>
+        </a>
         <div>
           <p class="eyebrow">Pokédex</p>
           <h1>Micah+Isla's Pokédex</h1>
           <p class="subtitle">Powered by Daddy</p>
         </div>
-      </a>
+      </div>
       <nav class="nav-links">
-        <a href="list.html">All Pokémon</a>
+        <a href="list.html">Pokédex</a>
+        <a href="team.html">Team Builder</a>
+        <a href="quiz.html">Quiz Mode</a>
       </nav>
       <form id="search-form" class="search">
         <label class="sr-only" for="search-input">Search by name or ID</label>
@@ -35,16 +39,38 @@
 
     <main class="content">
       <section id="status" class="status" role="status" aria-live="polite"></section>
-      <div class="pager">
-        <button type="button" id="prev-btn" aria-label="Previous Pokémon">← Prev</button>
-        <button type="button" id="next-btn" aria-label="Next Pokémon">Next →</button>
+      <div id="loading-panel" class="loading-panel" hidden>
+        <div class="pokeball loading-ball" aria-hidden="true"></div>
+        <p class="loading-panel__text">Searching for a Pokémon...</p>
+      </div>
+      <div class="pager-cards">
+        <a id="prev-card" class="pager-card" href="#">
+          <span class="pager-card__arrow">←</span>
+          <div class="pager-card__media">
+            <div class="pokeball loading-ball pager-card__loader" aria-hidden="true"></div>
+            <img class="pager-card__img" alt="" />
+          </div>
+          <div class="pager-card__meta">
+            <p class="pager-card__id">#000</p>
+            <p class="pager-card__name">Previous</p>
+          </div>
+        </a>
+        <a id="next-card" class="pager-card" href="#">
+          <div class="pager-card__meta">
+            <p class="pager-card__id">#000</p>
+            <p class="pager-card__name">Next</p>
+          </div>
+          <div class="pager-card__media">
+            <div class="pokeball loading-ball pager-card__loader" aria-hidden="true"></div>
+            <img class="pager-card__img" alt="" />
+          </div>
+          <span class="pager-card__arrow">→</span>
+        </a>
       </div>
       <div class="tabs">
         <button class="tab active" data-tab="details">Details</button>
-        <button class="tab" data-tab="evolution">Evolution</button>
         <button class="tab" data-tab="gallery">Gallery</button>
-        <button class="tab" data-tab="moves">Moves</button>
-        <button class="tab" data-tab="battle">Battle Data</button>
+        <button class="tab" data-tab="moves">Moves & Battle</button>
       </div>
       <section id="card" class="card tab-panel" data-tab-panel="details" hidden>
         <div class="card__header">
@@ -53,7 +79,9 @@
             <h2 id="poke-name">Pokemon</h2>
             <div class="title-actions">
               <button id="favorite-btn" class="ghost-btn" type="button">Favorite</button>
+              <button id="team-btn" class="ghost-btn" type="button">Team +</button>
               <button id="cry-btn" class="ghost-btn" type="button">Play Cry</button>
+              <button id="voice-btn" class="ghost-btn" type="button">🔊 Pokédex Voice</button>
             </div>
             <p id="genus" class="genus">—</p>
             <p id="flavor" class="flavor">—</p>
@@ -65,14 +93,6 @@
 
         <div class="card__meta">
           <div>
-            <p class="label">Height</p>
-            <p id="height" class="value">—</p>
-          </div>
-          <div>
-            <p class="label">Weight</p>
-            <p id="weight" class="value">—</p>
-          </div>
-          <div>
             <p class="label">Generation</p>
             <p id="generation" class="value">—</p>
           </div>
@@ -80,9 +100,54 @@
             <p class="label">Region</p>
             <p id="region" class="value">—</p>
           </div>
+        </div>
+
+        <div class="card__body">
           <div>
-            <p class="label">Base Exp</p>
-              <p id="base-exp" class="value badge">—</p>
+            <p class="label">Abilities</p>
+            <ul id="abilities" class="chips"></ul>
+          </div>
+
+          <div>
+            <p class="label">Fun Facts</p>
+            <ul id="fun-facts" class="chips"></ul>
+          </div>
+
+          <div>
+            <div class="label-row">
+              <p class="label">Stats</p>
+              <p class="value badge" id="bst">Base Stat Total: —</p>
+              <p class="value badge" id="base-exp">Base Exp: —</p>
+            </div>
+            <ul id="stats" class="stats"></ul>
+          </div>
+
+        </div>
+
+        <div class="card__section">
+          <div class="card__title">
+            <h2>Evolution</h2>
+            <p class="subtitle">Tap a stage to open its details</p>
+          </div>
+          <div id="evolution-container" class="evolution"></div>
+        </div>
+
+        <div class="card__section">
+          <div class="card__title">
+            <h2>Alternative Forms</h2>
+            <p class="subtitle">Regional and alternate forms</p>
+          </div>
+          <div id="alt-forms" class="evo-special__grid"></div>
+        </div>
+
+        <div class="card__meta card__meta--secondary">
+          <div>
+            <p class="label">Height</p>
+            <p id="height" class="value">—</p>
+          </div>
+          <div>
+            <p class="label">Weight</p>
+            <p id="weight" class="value">—</p>
           </div>
           <div>
             <p class="label">Gender Ratio</p>
@@ -96,49 +161,15 @@
             <p class="label">Habitat</p>
             <p id="habitat" class="value">—</p>
           </div>
-          <div>
+          <div class="meta-wide">
             <p class="label">Locations</p>
             <ul id="locations" class="locations-list"></ul>
           </div>
-          <div>
+          <div class="meta-wide">
             <p class="label">Versions</p>
             <ul id="versions" class="versions-list"></ul>
           </div>
         </div>
-
-        <div class="card__body">
-          <div>
-            <p class="label">Abilities</p>
-            <ul id="abilities" class="chips"></ul>
-          </div>
-
-          <div>
-            <p class="label">Regional / Other Forms</p>
-            <ul id="forms" class="chips"></ul>
-          </div>
-
-          <div>
-            <div class="label-row">
-              <p class="label">Stats</p>
-              <p class="value badge" id="bst">Base Stat Total: —</p>
-            </div>
-            <ul id="stats" class="stats"></ul>
-          </div>
-
-          <div>
-            <p class="label">Fun Facts</p>
-            <ul id="fun-facts" class="chips"></ul>
-          </div>
-
-        </div>
-      </section>
-
-      <section class="card tab-panel" data-tab-panel="evolution" hidden>
-        <div class="card__title">
-          <h2>Evolution</h2>
-          <p class="subtitle">Tap a stage to open its details</p>
-        </div>
-        <div id="evolution-container" class="evolution"></div>
       </section>
 
       <section class="card tab-panel" data-tab-panel="gallery" hidden>
@@ -155,28 +186,11 @@
 
       <section class="card tab-panel" data-tab-panel="moves" hidden>
         <div class="card__title">
-          <h2>Moves</h2>
-          <p class="subtitle">Level-up, machine (TM/HM/TR), and breeding moves</p>
+          <h2>Moves & Battle</h2>
+          <p class="subtitle">Moves plus type weaknesses, resistances, and immunities</p>
         </div>
-        <div class="moves-grid">
-          <div>
-            <p class="label">Level Up</p>
-            <ul id="moves-level" class="moves-list"></ul>
-          </div>
-          <div>
-            <p class="label">TM/HM/TR</p>
-            <ul id="moves-machine" class="moves-list"></ul>
-          </div>
-          <div>
-            <p class="label">Breeding</p>
-            <ul id="moves-egg" class="moves-list"></ul>
-          </div>
-        </div>
-      </section>
-
-      <section class="card tab-panel" data-tab-panel="battle" hidden>
         <div class="card__title">
-          <h2>Battle Data</h2>
+          <h3>Battle Data</h3>
           <p class="subtitle">Type weaknesses, resistances, and immunities</p>
         </div>
         <div class="battle-grid">
@@ -191,6 +205,20 @@
           <div>
             <p class="label">Immune</p>
             <ul id="eff-immune" class="chips"></ul>
+          </div>
+        </div>
+        <div class="moves-grid">
+          <div>
+            <p class="label">Level Up</p>
+            <ul id="moves-level" class="moves-list"></ul>
+          </div>
+          <div>
+            <p class="label">TM/HM/TR</p>
+            <ul id="moves-machine" class="moves-list"></ul>
+          </div>
+          <div>
+            <p class="label">Breeding</p>
+            <ul id="moves-egg" class="moves-list"></ul>
           </div>
         </div>
       </section>

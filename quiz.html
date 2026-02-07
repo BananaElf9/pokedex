@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokédex — Quiz Mode</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="title-group">
+        <a class="pokeball-link" href="list.html" aria-label="Back to home">
+          <div class="pokeball" aria-hidden="true"></div>
+        </a>
+        <div>
+          <p class="eyebrow">Pokédex</p>
+          <h1>Quiz Mode</h1>
+          <p class="subtitle">Guess the Pokémon from the silhouette</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="list.html">Pokédex</a>
+        <a href="team.html">Team Builder</a>
+        <a href="quiz.html">Quiz Mode</a>
+      </nav>
+    </header>
+
+    <section class="panel">
+      <div class="panel__header">
+        <h2>Who’s that Pokémon?</h2>
+        <p class="subtitle">Type the name to guess.</p>
+      </div>
+      <div class="quiz">
+        <img id="quiz-image" class="quiz__image" alt="Quiz silhouette" />
+        <div class="quiz__controls">
+          <input id="quiz-input" type="text" placeholder="Type the name..." autocomplete="off" />
+          <button id="quiz-check" type="button">Check</button>
+          <button id="quiz-reveal" class="ghost-btn" type="button">Reveal</button>
+          <button id="quiz-next" class="ghost-btn" type="button">Next</button>
+        </div>
+        <p id="quiz-status" class="status">Loading…</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="quiz.js"></script>
+</body>
+</html>

@@ -23,17 +23,54 @@
     'iron-boulder',
     'iron-crown'
   ]);
+  const STARTER_SET = new Set([
+    'bulbasaur','ivysaur','venusaur','charmander','charmeleon','charizard','squirtle','wartortle','blastoise',
+    'chikorita','bayleef','meganium','cyndaquil','quilava','typhlosion','totodile','croconaw','feraligatr',
+    'treecko','grovyle','sceptile','torchic','combusken','blaziken','mudkip','marshtomp','swampert',
+    'turtwig','grotle','torterra','chimchar','monferno','infernape','piplup','prinplup','empoleon',
+    'snivy','servine','serperior','tepig','pignite','emboar','oshawott','dewott','samurott',
+    'chespin','quilladin','chesnaught','fennekin','braixen','delphox','froakie','frogadier','greninja',
+    'rowlet','dartrix','decidueye','litten','torracat','incineroar','popplio','brionne','primarina',
+    'grookey','thwackey','rillaboom','scorbunny','raboot','cinderace','sobble','drizzile','inteleon',
+    'sprigatito','floragato','meowscarada','fuecoco','crocalor','skeledirge','quaxly','quaxwell','quaquaval'
+  ]);
+  const ULTRA_BEAST_SET = new Set([
+    'nihilego','buzzwole','pheromosa','xurkitree','celesteela','kartana','guzzlord',
+    'poipole','naganadel','stakataka','blacephalon'
+  ]);
+  const LEGENDARY_SET = new Set([
+    'articuno','zapdos','moltres','mewtwo',
+    'raikou','entei','suicune','lugia','ho-oh',
+    'regirock','regice','registeel','latias','latios','kyogre','groudon','rayquaza',
+    'uxie','mesprit','azelf','dialga','palkia','heatran','regigigas','giratina','cresselia',
+    'cobalion','terrakion','virizion','tornadus','thundurus','landorus','reshiram','zekrom','kyurem',
+    'xerneas','yveltal','zygarde','type-null','silvally',
+    'tapu-koko','tapu-lele','tapu-bulu','tapu-fini','cosmog','cosmoem','solgaleo','lunala','necrozma',
+    'zacian','zamazenta','eternatus','kubfu','urshifu','regieleki','regidrago','glastrier','spectrier','calyrex',
+    'ting-lu','chien-pao','wo-chien','chi-yu','koraidon','miraidon','ogerpon','terapagos','pecharunt'
+  ]);
+  const MYTHICAL_SET = new Set([
+    'mew','celebi','jirachi','deoxys','phione','manaphy','darkrai','shaymin','arceus',
+    'victini','keldeo','meloetta','genesect',
+    'diancie','hoopa','volcanion',
+    'magearna','marshadow','zeraora','meltan','melmetal',
+    'zarude'
+  ]);
   const TERASTAL_SET = new Set([
     'terapagos-terastal',
     'terapagos-stellar'
   ]);
   const FORM_FILTERS = [
-    { id: 'mega', label: 'Mega Evolution', match: name => name.includes('-mega') },
+    { id: 'starter', label: 'Starter', match: name => STARTER_SET.has(name) },
+    { id: 'mega', label: 'Mega', match: name => name.includes('-mega') },
     { id: 'gmax', label: 'Gigantamax', match: name => name.includes('-gmax') },
-    { id: 'alola', label: 'Alola Form', match: name => name.includes('-alola') },
-    { id: 'galar', label: 'Galar Form', match: name => name.includes('-galar') },
-    { id: 'hisui', label: 'Hisui Form', match: name => name.includes('-hisui') },
-    { id: 'paldea', label: 'Paldea Form', match: name => name.includes('-paldea') },
+    { id: 'ultra-beast', label: 'Ultra beast', match: name => ULTRA_BEAST_SET.has(name) },
+    { id: 'legendary', label: 'Legendary', match: name => LEGENDARY_SET.has(name) },
+    { id: 'mythical', label: 'Mythical', match: name => MYTHICAL_SET.has(name) },
+    { id: 'alolan', label: 'Alolan', match: name => name.includes('-alola') },
+    { id: 'galarian', label: 'Galarian', match: name => name.includes('-galar') },
+    { id: 'hisuian', label: 'Hisuian', match: name => name.includes('-hisui') },
+    { id: 'paldean', label: 'Paldean', match: name => name.includes('-paldea') },
     { id: 'paradox', label: 'Paradox', match: name => PARADOX_SET.has(name) },
     { id: 'terastal', label: 'Terastal Form', match: name => TERASTAL_SET.has(name) }
   ];
@@ -50,24 +87,20 @@
   };
   const FAVORITES_KEY = 'pokedex-favorites';
   const TEAM_KEY = 'pokedex-team';
+  const MAX_TEAM = 6;
   const grid = document.getElementById('pokemon-grid');
-  const sortSelect = document.getElementById('sort-select');
-  const genSelect = document.getElementById('gen-select');
   const loadStatus = document.getElementById('load-status');
+  const sortFilters = document.getElementById('sort-filters');
+  const genFilters = document.getElementById('gen-filters');
   const typeFilters = document.getElementById('type-filters');
   const formFilters = document.getElementById('form-filters');
   const searchInput = document.getElementById('search-list');
   const favoritesOnlyInput = document.getElementById('favorites-only');
   const randomBtn = document.getElementById('random-list');
-  const teamSlots = document.getElementById('team-slots');
-  const teamCoverage = document.getElementById('team-coverage');
-  const clearTeamBtn = document.getElementById('clear-team');
-  const quizImage = document.getElementById('quiz-image');
-  const quizInput = document.getElementById('quiz-input');
-  const quizCheckBtn = document.getElementById('quiz-check');
-  const quizRevealBtn = document.getElementById('quiz-reveal');
-  const quizNextBtn = document.getElementById('quiz-next');
-  const quizStatus = document.getElementById('quiz-status');
+  const sortToggle = document.getElementById('toggle-sort');
+  const filterToggle = document.getElementById('toggle-filters');
+  const sortPanel = document.getElementById('sort-panel');
+  const filterPanel = document.getElementById('filter-panel');
 
   const typeColors = {
     normal: '#a8a77a',
@@ -95,14 +128,27 @@
   const selectedTypes = new Set();
   const selectedForms = new Set();
   let favoritesOnly = false;
-  let selectedGen = 'all';
+  const selectedGens = new Set();
+  let selectedSort = 'number';
   let favorites = new Set();
   let team = [];
-  let quizAnswer = null;
   let query = '';
 
+  let statusTimer = null;
+
   function setStatus(text) {
+    if (!loadStatus) return;
     loadStatus.textContent = text;
+    loadStatus.classList.add('is-visible');
+    if (statusTimer) {
+      clearTimeout(statusTimer);
+      statusTimer = null;
+    }
+    if (/^Loaded\b/i.test(text) || /Failed/i.test(text)) {
+      statusTimer = setTimeout(() => {
+        loadStatus.classList.remove('is-visible');
+      }, 3000);
+    }
   }
 
   function parseId(url) {
@@ -143,17 +189,34 @@
 
   function loadTeam() {
     const list = parseStorage(TEAM_KEY, []);
-    team = Array.isArray(list) ? list.slice(0, 6) : [];
+    team = Array.isArray(list) ? list.slice(0, MAX_TEAM) : [];
   }
 
   function saveTeam() {
     saveStorage(TEAM_KEY, team);
   }
 
-  function normalizeGuess(text) {
-    return String(text || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '');
+  function toggleTeamMember(name) {
+    const idx = team.indexOf(name);
+    if (idx >= 0) {
+      team.splice(idx, 1);
+      saveTeam();
+      render(allPokemon, selectedSort);
+      return;
+    }
+    if (team.length >= MAX_TEAM) {
+      setStatus('Team is full. Remove one to add another.');
+      return;
+    }
+    team.push(name);
+    saveTeam();
+    render(allPokemon, selectedSort);
+  }
+
+  function setPanelState(panel, toggle, isOpen) {
+    if (!panel || !toggle) return;
+    panel.classList.toggle('is-open', isOpen);
+    toggle.setAttribute('aria-expanded', String(isOpen));
   }
 
   async function fetchList() {
@@ -225,11 +288,13 @@
         mon.forms?.some(form => selectedForms.has(form))
       );
     }
-    if (selectedGen !== 'all') {
-      const [min, max] = GEN_RANGES[selectedGen] || [];
-      if (min && max) {
-        filtered = filtered.filter(mon => mon.speciesId >= min && mon.speciesId <= max);
-      }
+    if (selectedGens.size) {
+      filtered = filtered.filter(mon =>
+        Array.from(selectedGens).some(gen => {
+          const [min, max] = GEN_RANGES[gen] || [];
+          return min && max && mon.speciesId >= min && mon.speciesId <= max;
+        })
+      );
     }
     if (favoritesOnly) {
       filtered = filtered.filter(mon => favorites.has(mon.name));
@@ -295,16 +360,17 @@
           favorites.add(mon.name);
         }
         saveFavorites();
-        render(allPokemon, sortSelect.value);
+        render(allPokemon, selectedSort);
       });
 
       const teamBtn = document.createElement('button');
       teamBtn.className = 'icon-btn';
       teamBtn.type = 'button';
-      teamBtn.textContent = 'Team';
-      teamBtn.setAttribute('aria-pressed', team.includes(mon.name));
-      teamBtn.setAttribute('aria-label', 'Add or remove from team');
-      if (team.includes(mon.name)) teamBtn.classList.add('is-active');
+      const inTeam = team.includes(mon.name);
+      teamBtn.textContent = inTeam ? 'Team ✓' : 'Team +';
+      teamBtn.setAttribute('aria-pressed', inTeam);
+      teamBtn.setAttribute('aria-label', inTeam ? 'Remove from team' : 'Add to team');
+      if (inTeam) teamBtn.classList.add('is-active');
       teamBtn.addEventListener('click', evt => {
         evt.preventDefault();
         evt.stopPropagation();
@@ -333,11 +399,13 @@
 
   function applyTypeStyle(label, type, isChecked) {
     if (isChecked) {
+      label.classList.add('is-active');
       const color = typeColors[type] || '#f97316';
       label.style.background = color;
       label.style.borderColor = color;
       label.style.color = getTextColor(color);
     } else {
+      label.classList.remove('is-active');
       label.style.background = '';
       label.style.borderColor = '';
       label.style.color = '';
@@ -346,10 +414,12 @@
 
   function applyFormStyle(label, isChecked) {
     if (isChecked) {
+      label.classList.add('is-active');
       label.style.background = 'rgba(249, 115, 22, 0.2)';
       label.style.borderColor = '#f97316';
       label.style.color = '#f8fafc';
     } else {
+      label.classList.remove('is-active');
       label.style.background = '';
       label.style.borderColor = '';
       label.style.color = '';
@@ -372,7 +442,7 @@
           selectedTypes.delete(type);
         }
         applyTypeStyle(label, type, checkbox.checked);
-        render(allPokemon, sortSelect.value);
+        render(allPokemon, selectedSort);
       });
 
       const text = document.createElement('span');
@@ -402,7 +472,7 @@
           selectedForms.delete(form.id);
         }
         applyFormStyle(label, checkbox.checked);
-        render(allPokemon, sortSelect.value);
+        render(allPokemon, selectedSort);
       });
 
       const text = document.createElement('span');
@@ -414,122 +484,86 @@
     });
   }
 
-  function renderTeam() {
-    if (!teamSlots || !teamCoverage) return;
-    teamSlots.innerHTML = '';
-    teamCoverage.innerHTML = '';
-    const filled = team
-      .map(name => pokemonByName.get(name))
-      .filter(Boolean);
+  function renderGenFilters() {
+    if (!genFilters) return;
+    genFilters.innerHTML = '';
+    const gens = [
+      { id: '1', label: 'Gen 1 — Kanto' },
+      { id: '2', label: 'Gen 2 — Johto' },
+      { id: '3', label: 'Gen 3 — Hoenn' },
+      { id: '4', label: 'Gen 4 — Sinnoh' },
+      { id: '5', label: 'Gen 5 — Unova' },
+      { id: '6', label: 'Gen 6 — Kalos' },
+      { id: '7', label: 'Gen 7 — Alola' },
+      { id: '8', label: 'Gen 8 — Galar' },
+      { id: '9', label: 'Gen 9 — Paldea' }
+    ];
 
-    for (let i = 0; i < 6; i += 1) {
-      const slot = document.createElement('div');
-      slot.className = 'team-slot';
-      const member = filled[i];
-      if (member) {
-        const img = document.createElement('img');
-        img.src = member.sprite;
-        img.alt = member.name;
-        img.loading = 'lazy';
+    gens.forEach(gen => {
+      const label = document.createElement('label');
+      label.className = 'filter-pill';
 
-        const name = document.createElement('p');
-        name.className = 'mini-card__name';
-        name.textContent = member.name;
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = gen.id;
+      checkbox.checked = selectedGens.has(gen.id);
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          selectedGens.add(gen.id);
+        } else {
+          selectedGens.delete(gen.id);
+        }
+        applyFormStyle(label, checkbox.checked);
+        render(allPokemon, selectedSort);
+      });
 
-        const remove = document.createElement('button');
-        remove.className = 'icon-btn';
-        remove.type = 'button';
-        remove.textContent = 'Remove';
-        remove.addEventListener('click', () => toggleTeamMember(member.name));
+      const text = document.createElement('span');
+      text.textContent = gen.label;
 
-        slot.append(img, name, remove);
-      } else {
-        const empty = document.createElement('p');
-        empty.className = 'label';
-        empty.textContent = 'Empty slot';
-        slot.appendChild(empty);
-      }
-      teamSlots.appendChild(slot);
-    }
-
-    const typeSet = new Set();
-    filled.forEach(mon => {
-      mon.types.forEach(type => typeSet.add(type));
-    });
-    if (typeSet.size === 0) {
-      const empty = document.createElement('span');
-      empty.className = 'move-meta';
-      empty.textContent = '—';
-      teamCoverage.appendChild(empty);
-      return;
-    }
-    typeSet.forEach(type => {
-      const pill = document.createElement('span');
-      pill.className = 'type-pill small';
-      pill.textContent = type;
-      pill.style.background = typeColors[type] || '#e2e8f0';
-      teamCoverage.appendChild(pill);
+      label.append(checkbox, text);
+      genFilters.appendChild(label);
+      applyFormStyle(label, checkbox.checked);
     });
   }
 
-  function toggleTeamMember(name) {
-    const idx = team.indexOf(name);
-    if (idx >= 0) {
-      team.splice(idx, 1);
-      saveTeam();
-      render(allPokemon, sortSelect.value);
-      renderTeam();
-      return;
-    }
-    if (team.length >= 6) {
-      setStatus('Team is full. Remove one to add another.');
-      return;
-    }
-    team.push(name);
-    saveTeam();
-    render(allPokemon, sortSelect.value);
-    renderTeam();
+  function renderSortFilters() {
+    if (!sortFilters) return;
+    sortFilters.innerHTML = '';
+    const options = [
+      { id: 'number', label: 'Number' },
+      { id: 'name', label: 'Name' },
+      { id: 'type', label: 'Type' }
+    ];
+
+    options.forEach(option => {
+      const label = document.createElement('label');
+      label.className = 'filter-pill';
+
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'sort-filter';
+      radio.value = option.id;
+      radio.checked = selectedSort === option.id;
+      radio.addEventListener('change', () => {
+        if (!radio.checked) return;
+        selectedSort = option.id;
+        renderSortFilters();
+        render(allPokemon, selectedSort);
+      });
+
+      const text = document.createElement('span');
+      text.textContent = option.label;
+
+      label.append(radio, text);
+      sortFilters.appendChild(label);
+      applyFormStyle(label, radio.checked);
+    });
   }
 
   function pickRandomFrom(list) {
     if (!list.length) return null;
     const index = Math.floor(Math.random() * list.length);
     return list[index];
-  }
-
-  function startQuiz(next = true) {
-    if (!quizImage || !quizStatus || !quizInput) return;
-    const pool = filterPokemon(allPokemon);
-    const chosen = pickRandomFrom(pool.length ? pool : allPokemon);
-    if (!chosen) return;
-    quizAnswer = chosen;
-    quizImage.src = chosen.sprite;
-    quizImage.alt = 'Quiz silhouette';
-    quizImage.classList.add('quiz__image--hidden');
-    quizInput.value = '';
-    quizStatus.textContent = next ? 'Who is this Pokémon?' : quizStatus.textContent;
-  }
-
-  function revealQuizAnswer() {
-    if (!quizAnswer || !quizImage || !quizStatus) return;
-    quizImage.classList.remove('quiz__image--hidden');
-    quizStatus.textContent = `It was ${quizAnswer.name}!`;
-  }
-
-  function checkQuizAnswer() {
-    if (!quizAnswer || !quizStatus) return;
-    const guess = normalizeGuess(quizInput.value);
-    const answer = normalizeGuess(quizAnswer.name);
-    if (!guess) {
-      quizStatus.textContent = 'Type a name to guess!';
-      return;
-    }
-    if (guess === answer) {
-      quizImage.classList.remove('quiz__image--hidden');
-      quizStatus.textContent = 'Correct! Nice job.';
-    } else {
-      quizStatus.textContent = 'Not quite. Try again or press Reveal!';
-    }
   }
 
   async function init() {
@@ -542,33 +576,29 @@
       pokemonByName = new Map(allPokemon.map(mon => [mon.name, mon]));
       renderTypeFilters();
       renderFormFilters();
+      renderGenFilters();
+      renderSortFilters();
       loadFavorites();
       loadTeam();
-      render(allPokemon, sortSelect.value);
-      renderTeam();
-      startQuiz(false);
+      render(allPokemon, selectedSort);
     } catch (err) {
       setStatus(err.message || 'Failed to load Pokémon.');
     }
   }
 
-  sortSelect.addEventListener('change', () => {
-    render(allPokemon, sortSelect.value);
-  });
-
-  genSelect?.addEventListener('change', evt => {
-    selectedGen = evt.target.value;
-    render(allPokemon, sortSelect.value);
-  });
-
   searchInput?.addEventListener('input', evt => {
     query = evt.target.value.trim().toLowerCase();
-    render(allPokemon, sortSelect.value);
+    render(allPokemon, selectedSort);
   });
 
   favoritesOnlyInput?.addEventListener('change', evt => {
     favoritesOnly = evt.target.checked;
-    render(allPokemon, sortSelect.value);
+    const favLabel = favoritesOnlyInput?.closest('label');
+    if (favLabel) {
+      favLabel.classList.toggle('is-active', favoritesOnly);
+      favLabel.classList.toggle('is-favorite', favoritesOnly);
+    }
+    render(allPokemon, selectedSort);
   });
 
   randomBtn?.addEventListener('click', () => {
@@ -578,21 +608,14 @@
     window.location.href = `index.html?pokemon=${encodeURIComponent(chosen.name)}`;
   });
 
-  clearTeamBtn?.addEventListener('click', () => {
-    team = [];
-    saveTeam();
-    render(allPokemon, sortSelect.value);
-    renderTeam();
+  sortToggle?.addEventListener('click', () => {
+    const isOpen = !sortPanel?.classList.contains('is-open');
+    setPanelState(sortPanel, sortToggle, isOpen);
   });
 
-  quizCheckBtn?.addEventListener('click', checkQuizAnswer);
-  quizRevealBtn?.addEventListener('click', revealQuizAnswer);
-  quizNextBtn?.addEventListener('click', () => startQuiz(true));
-  quizInput?.addEventListener('keydown', evt => {
-    if (evt.key === 'Enter') {
-      evt.preventDefault();
-      checkQuizAnswer();
-    }
+  filterToggle?.addEventListener('click', () => {
+    const isOpen = !filterPanel?.classList.contains('is-open');
+    setPanelState(filterPanel, filterToggle, isOpen);
   });
 
   init();

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokédex — Team Builder</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div class="title-group">
+        <a class="pokeball-link" href="list.html" aria-label="Back to home">
+          <div class="pokeball" aria-hidden="true"></div>
+        </a>
+        <div>
+          <p class="eyebrow">Pokédex</p>
+          <h1>Team Builder</h1>
+          <p class="subtitle">Pick up to 6 Pokémon and see type coverage</p>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="list.html">Pokédex</a>
+        <a href="team.html">Team Builder</a>
+        <a href="quiz.html">Quiz Mode</a>
+      </nav>
+    </header>
+
+    <section class="toolbar">
+      <div class="toolbar__search">
+        <label class="sr-only" for="team-add-input">Add Pokémon by name or ID</label>
+        <input id="team-add-input" type="text" placeholder="Add by name or ID..." autocomplete="off" />
+      </div>
+      <div class="toolbar__actions">
+        <button id="team-add-btn" class="ghost-btn" type="button">Add</button>
+        <button id="clear-team" class="ghost-btn" type="button">Clear team</button>
+      </div>
+      <div id="team-status" class="status" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel__header">
+        <h2>Your Team</h2>
+        <p class="subtitle">Tap remove to swap Pokémon</p>
+      </div>
+      <div id="team-slots" class="team-slots"></div>
+      <div>
+        <p class="label">Type Coverage</p>
+        <div id="team-coverage" class="chips"></div>
+      </div>
+    </section>
+  </div>
+
+  <script src="team.js"></script>
+</body>
+</html>
