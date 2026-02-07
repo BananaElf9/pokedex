@@ -1111,6 +1111,8 @@
       const eff = await computeEffectiveness(pokemon.types || []);
       renderEffectiveness(eff);
       setStatus('Found it!', 'success');
+      const nextUrl = `index.html?pokemon=${encodeURIComponent(pokemon.name)}`;
+      window.history.replaceState(null, '', nextUrl);
     } catch (err) {
       setStatus(err.message || 'Something went wrong.', 'error');
       card.hidden = true;
