@@ -19,6 +19,8 @@
   const typesEl = document.getElementById('types');
   const heightEl = document.getElementById('height');
   const weightEl = document.getElementById('weight');
+  const generationEl = document.getElementById('generation');
+  const regionEl = document.getElementById('region');
   const baseExpEl = document.getElementById('base-exp');
   const genderEl = document.getElementById('gender');
   const eggEl = document.getElementById('egg-groups');
@@ -32,6 +34,7 @@
   const movesMachineEl = document.getElementById('moves-machine');
   const movesEggEl = document.getElementById('moves-egg');
   const galleryEl = document.getElementById('gallery');
+  const formsGalleryEl = document.getElementById('forms-gallery');
   const flavorEl = document.getElementById('flavor');
   const genusEl = document.getElementById('genus');
   const formsEl = document.getElementById('forms');
@@ -49,6 +52,7 @@
   const abilityCache = new Map();
   const locationCache = new Map();
   const typeCache = new Map();
+  const formsCache = new Map();
   const spriteVariants = [
     { label: 'Official', path: ['other', 'official-artwork', 'front_default'] },
     { label: 'Official Shiny', path: ['other', 'official-artwork', 'front_shiny'] },
@@ -571,6 +575,36 @@
     return text?.replace(/-/g, ' ') ?? '';
   }
 
+  function generationLabel(genName) {
+    const map = {
+      'generation-i': 'Gen 1',
+      'generation-ii': 'Gen 2',
+      'generation-iii': 'Gen 3',
+      'generation-iv': 'Gen 4',
+      'generation-v': 'Gen 5',
+      'generation-vi': 'Gen 6',
+      'generation-vii': 'Gen 7',
+      'generation-viii': 'Gen 8',
+      'generation-ix': 'Gen 9'
+    };
+    return map[genName] || cleanName(genName) || '—';
+  }
+
+  function regionFromGeneration(genName) {
+    const map = {
+      'generation-i': 'Kanto',
+      'generation-ii': 'Johto',
+      'generation-iii': 'Hoenn',
+      'generation-iv': 'Sinnoh',
+      'generation-v': 'Unova',
+      'generation-vi': 'Kalos',
+      'generation-vii': 'Alola',
+      'generation-viii': 'Galar',
+      'generation-ix': 'Paldea'
+    };
+    return map[genName] || 'Unknown';
+  }
+
   function titleCase(text) {
     return String(text || '')
       .split(' ')
@@ -646,6 +680,20 @@
   function setupCry(pokemon) {
     if (!cryBtn) return;
     const cryUrl = pokemon?.cries?.latest || pokemon?.cries?.legacy;
+    const canPlayOgg = (() => {
+      try {
+        const audio = document.createElement('audio');
+        return Boolean(audio.canPlayType('audio/ogg; codecs="vorbis"'));
+      } catch (err) {
+        return false;
+      }
+    })();
+    if (!canPlayOgg) {
+      cryBtn.disabled = true;
+      cryBtn.textContent = 'Cry not supported';
+      cryAudio = null;
+      return;
+    }
     if (!cryUrl) {
       cryBtn.disabled = true;
       cryBtn.textContent = 'No Cry';
@@ -697,6 +745,83 @@
     }
 
     galleryEl.appendChild(frag);
+  }
+
+  async function fetchFormEntry(form) {
+    if (!form?.url) return null;
+    if (formsCache.has(form.url)) return formsCache.get(form.url);
+    try {
+      const res = await fetch(form.url);
+      if (!res.ok) throw new Error('bad form');
+      const data = await res.json();
+      const baseName = cleanName(data.pokemon?.name || form.name || data.name);
+      const formName = cleanName(data.form_name || '');
+      const label =
+        formName && formName !== baseName
+          ? `${baseName} (${titleCase(formName)})`
+          : baseName;
+      const entry = {
+        name: data.name || form.name,
+        label,
+        sprite:
+          data.sprites?.other?.['official-artwork']?.front_default ||
+          data.sprites?.front_default ||
+          null
+      };
+      formsCache.set(form.url, entry);
+      return entry;
+    } catch (err) {
+      const entry = { name: form.name, label: cleanName(form.name), sprite: null };
+      formsCache.set(form.url, entry);
+      return entry;
+    }
+  }
+
+  async function renderAllForms(forms) {
+    if (!formsGalleryEl) return;
+    formsGalleryEl.innerHTML = '';
+    const list = (forms || []).filter(f => f?.url);
+    if (list.length <= 1) {
+      const empty = document.createElement('p');
+      empty.className = 'subtitle';
+      empty.textContent = 'No extra forms available.';
+      formsGalleryEl.appendChild(empty);
+      return;
+    }
+
+    const results = await Promise.all(list.map(fetchFormEntry));
+    const frag = document.createDocumentFragment();
+    results
+      .filter(Boolean)
+      .forEach(form => {
+        const card = document.createElement('div');
+        card.className = 'gallery-card';
+
+        if (form.sprite) {
+          const img = document.createElement('img');
+          img.src = form.sprite;
+          img.alt = form.label;
+          img.loading = 'lazy';
+          card.appendChild(img);
+        }
+
+        const label = document.createElement('p');
+        label.className = 'label';
+        label.textContent = form.label;
+        card.appendChild(label);
+
+        frag.appendChild(card);
+      });
+
+    if (!frag.childNodes.length) {
+      const empty = document.createElement('p');
+      empty.className = 'subtitle';
+      empty.textContent = 'No extra forms available.';
+      formsGalleryEl.appendChild(empty);
+      return;
+    }
+
+    formsGalleryEl.appendChild(frag);
   }
 
 
@@ -961,6 +1086,9 @@
       const flavorText = flavorEntries[0]?.flavor_text?.replace(/\s+/g, ' ') || '';
       const biologyText = flavorEntries[1]?.flavor_text?.replace(/\s+/g, ' ') || flavorText;
       const genusText = (species.genera || []).find(g => g.language?.name === 'en')?.genus || '';
+      const genName = species.generation?.name || '';
+      if (generationEl) generationEl.textContent = generationLabel(genName);
+      if (regionEl) regionEl.textContent = regionFromGeneration(genName);
       const varieties = species.varieties || [];
       renderForms(varieties, pokemon.name);
       const specialForms = varieties
@@ -979,6 +1107,7 @@
       const moves = await groupMoves(pokemon.moves || []);
       renderMoves(moves);
       renderGallery(pokemon.sprites || {});
+      renderAllForms(pokemon.forms || []);
       const eff = await computeEffectiveness(pokemon.types || []);
       renderEffectiveness(eff);
       setStatus('Found it!', 'success');
@@ -986,6 +1115,9 @@
       setStatus(err.message || 'Something went wrong.', 'error');
       card.hidden = true;
       if (evolutionContainer) evolutionContainer.innerHTML = '';
+      if (generationEl) generationEl.textContent = '—';
+      if (regionEl) regionEl.textContent = '—';
+      if (formsGalleryEl) formsGalleryEl.innerHTML = '';
       renderFunFacts(null, null);
       renderMoves({ level: [], machine: [], egg: [] });
       renderGallery({});
@@ -1032,6 +1164,7 @@
   favoriteBtn?.addEventListener('click', () => {
     if (currentName) toggleFavorite(currentName);
   });
+
 
   cryBtn?.addEventListener('click', () => {
     if (cryAudio) {

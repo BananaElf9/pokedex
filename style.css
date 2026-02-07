@@ -71,6 +71,7 @@ body {
   text-decoration: none;
 }
 
+
 .pokeball {
   width: 52px;
   height: 52px;
@@ -332,6 +333,7 @@ h1 {
   color: var(--text);
   font-weight: 600;
 }
+
 
 .toolbar select:focus {
   outline: none;
@@ -864,6 +866,13 @@ h1 {
   margin: 0;
 }
 
+.gallery-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
 
 .stats {
   list-style: none;
@@ -930,6 +939,18 @@ h1 {
   .sprite {
     width: 140px;
     height: 140px;
+  }
+
+  .card__meta {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .card__body {
+    grid-template-columns: 1fr;
+  }
+
+  .chips {
+    flex-wrap: wrap;
   }
 }
 
