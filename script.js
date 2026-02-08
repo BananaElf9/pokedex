@@ -566,7 +566,7 @@
   }
 
   function getRegionalSuffix(name) {
-    const match = String(name || '').match(/-(alola|galar|hisui|paldea)$/i);
+    const match = String(name || '').match(/-(alola|galar|hisui|paldea)(?:-|$)/i);
     return match ? match[1].toLowerCase() : null;
   }
 
@@ -926,6 +926,29 @@
       'generation-ix': 'Paldea'
     };
     return map[genName] || 'Unknown';
+  }
+
+  function resolveGenerationRegion(pokemonName, speciesGenName) {
+    const regional = getRegionalSuffix(pokemonName);
+    if (regional) {
+      const regionalMap = {
+        alola: { gen: 'generation-vii', region: 'Alola' },
+        galar: { gen: 'generation-viii', region: 'Galar' },
+        hisui: { gen: 'generation-viii', region: 'Hisui' },
+        paldea: { gen: 'generation-ix', region: 'Paldea' }
+      };
+      const entry = regionalMap[regional];
+      if (entry) {
+        return {
+          generationLabel: generationLabel(entry.gen),
+          regionText: entry.region
+        };
+      }
+    }
+    return {
+      generationLabel: generationLabel(speciesGenName),
+      regionText: regionFromGeneration(speciesGenName)
+    };
   }
 
   function titleCase(text) {
@@ -1587,8 +1610,8 @@
         biologyText = '';
       }
       const genName = species.generation?.name || '';
-      const regionText = regionFromGeneration(genName);
-      if (generationEl) generationEl.textContent = generationLabel(genName);
+      const { generationLabel: genLabel, regionText } = resolveGenerationRegion(pokemon.name, genName);
+      if (generationEl) generationEl.textContent = genLabel;
       if (regionEl) regionEl.textContent = regionText;
       const varieties = species.varieties || [];
       renderForms(varieties, pokemon.name);
