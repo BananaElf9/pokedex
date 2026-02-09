@@ -90,6 +90,7 @@
   const MAX_TEAM = 6;
   const grid = document.getElementById('pokemon-grid');
   const loadStatus = document.getElementById('load-status');
+  const loadMoreBtn = document.getElementById('load-more');
   const sortFilters = document.getElementById('sort-filters');
   const genFilters = document.getElementById('gen-filters');
   const typeFilters = document.getElementById('type-filters');
@@ -134,6 +135,12 @@
   let team = [];
   let query = '';
   let cardByName = new Map();
+  let basicList = [];
+  let basicByName = new Map();
+  const fetchedDetails = new Set();
+  const fetchingDetails = new Set();
+  const PAGE_SIZE = 60;
+  let visibleCount = PAGE_SIZE;
 
   let statusTimer = null;
 
@@ -202,7 +209,8 @@
     if (idx >= 0) {
       team.splice(idx, 1);
       saveTeam();
-      render(allPokemon, selectedSort);
+      visibleCount = PAGE_SIZE;
+      renderVisible();
       return;
     }
     if (team.length >= MAX_TEAM) {
@@ -211,7 +219,8 @@
     }
     team.push(name);
     saveTeam();
-    render(allPokemon, selectedSort);
+    visibleCount = PAGE_SIZE;
+    renderVisible();
   }
 
   function setPanelState(panel, toggle, isOpen) {
@@ -318,14 +327,12 @@
     return filtered;
   }
 
-  function render(pokemon, mode) {
-    const filtered = filterPokemon(pokemon);
-    const sorted = sortPokemon(filtered, mode);
+  function renderList(list) {
     grid.innerHTML = '';
     cardByName = new Map();
     const frag = document.createDocumentFragment();
 
-    sorted.forEach(mon => {
+    list.forEach(mon => {
       const card = document.createElement('a');
       card.className = 'mini-card';
       card.href = `index.html?pokemon=${encodeURIComponent(mon.name)}`;
@@ -373,7 +380,8 @@
           favorites.add(mon.name);
         }
         saveFavorites();
-        render(allPokemon, selectedSort);
+        visibleCount = PAGE_SIZE;
+        renderVisible();
       });
 
       const teamBtn = document.createElement('button');
@@ -398,6 +406,31 @@
     });
 
     grid.appendChild(frag);
+  }
+
+  function getFilteredSorted() {
+    const filtered = filterPokemon(allPokemon);
+    return sortPokemon(filtered, selectedSort);
+  }
+
+  function updateLoadMoreButton(total) {
+    if (!loadMoreBtn) return;
+    const remaining = Math.max(total - visibleCount, 0);
+    const canMore = remaining > 0;
+    loadMoreBtn.hidden = !canMore;
+    loadMoreBtn.disabled = !canMore;
+    if (canMore) {
+      const nextCount = Math.min(PAGE_SIZE, remaining);
+      loadMoreBtn.textContent = `Load more (${nextCount} more)`;
+    }
+  }
+
+  function renderVisible() {
+    const sorted = getFilteredSorted();
+    const visible = sorted.slice(0, visibleCount);
+    renderList(visible);
+    updateLoadMoreButton(sorted.length);
+    queueVisibleDetails(visible);
   }
 
   function updateCardDetails(mon) {
@@ -425,6 +458,36 @@
         types.appendChild(pill);
       });
     }
+  }
+
+  function queueVisibleDetails(visible) {
+    if (!visible?.length) return;
+    const entries = visible
+      .map(mon => basicByName.get(mon.name))
+      .filter(entry => entry && !fetchedDetails.has(entry.name) && !fetchingDetails.has(entry.name));
+    if (!entries.length) return;
+    entries.forEach(entry => fetchingDetails.add(entry.name));
+    setStatus('Fetching details…');
+    fetchDetailsProgressive(entries, {
+      onItem: payload => {
+        const entry = pokemonByName.get(payload.name);
+        if (!entry) return;
+        entry.types = payload.types || entry.types;
+        entry.forms = payload.forms || entry.forms;
+        entry.speciesId = payload.speciesId || entry.speciesId;
+        entry.sprite = payload.sprite || entry.sprite;
+        fetchedDetails.add(entry.name);
+        fetchingDetails.delete(entry.name);
+        updateCardDetails(entry);
+      },
+      onProgress: (done, total) => {
+        if (done === total) {
+          setStatus(`Loaded ${total} Pokémon details.`);
+        } else if (done % 10 === 0) {
+          setStatus(`Fetching details… ${done}/${total}`);
+        }
+      }
+    });
   }
 
   function getTextColor(hex) {
@@ -483,7 +546,8 @@
           selectedTypes.delete(type);
         }
         applyTypeStyle(label, type, checkbox.checked);
-        render(allPokemon, selectedSort);
+        visibleCount = PAGE_SIZE;
+        renderVisible();
       });
 
       const text = document.createElement('span');
@@ -513,7 +577,8 @@
           selectedForms.delete(form.id);
         }
         applyFormStyle(label, checkbox.checked);
-        render(allPokemon, selectedSort);
+        visibleCount = PAGE_SIZE;
+        renderVisible();
       });
 
       const text = document.createElement('span');
@@ -555,7 +620,8 @@
           selectedGens.delete(gen.id);
         }
         applyFormStyle(label, checkbox.checked);
-        render(allPokemon, selectedSort);
+        visibleCount = PAGE_SIZE;
+        renderVisible();
       });
 
       const text = document.createElement('span');
@@ -589,7 +655,8 @@
         if (!radio.checked) return;
         selectedSort = option.id;
         renderSortFilters();
-        render(allPokemon, selectedSort);
+        visibleCount = PAGE_SIZE;
+        renderVisible();
       });
 
       const text = document.createElement('span');
@@ -610,8 +677,9 @@
   async function init() {
     try {
       setStatus('Loading Pokémon list…');
-      const basic = await fetchList();
-      allPokemon = basic.map(entry => ({
+      basicList = await fetchList();
+      basicByName = new Map(basicList.map(entry => [entry.name, entry]));
+      allPokemon = basicList.map(entry => ({
         id: entry.id,
         name: entry.name,
         types: [],
@@ -626,27 +694,7 @@
       renderSortFilters();
       loadFavorites();
       loadTeam();
-      render(allPokemon, selectedSort);
-      setStatus('Fetching details…');
-
-      await fetchDetailsProgressive(basic, {
-        onItem: payload => {
-          const entry = pokemonByName.get(payload.name);
-          if (!entry) return;
-          entry.types = payload.types || entry.types;
-          entry.forms = payload.forms || entry.forms;
-          entry.speciesId = payload.speciesId || entry.speciesId;
-          entry.sprite = payload.sprite || entry.sprite;
-          updateCardDetails(entry);
-        },
-        onProgress: (done, total) => {
-          if (done === total) {
-            setStatus(`Loaded ${allPokemon.length} Pokémon.`);
-          } else if (done % 50 === 0) {
-            setStatus(`Fetching details… ${done}/${total}`);
-          }
-        }
-      });
+      renderVisible();
     } catch (err) {
       setStatus(err.message || 'Failed to load Pokémon.');
     }
@@ -654,7 +702,8 @@
 
   searchInput?.addEventListener('input', evt => {
     query = evt.target.value.trim().toLowerCase();
-    render(allPokemon, selectedSort);
+    visibleCount = PAGE_SIZE;
+    renderVisible();
   });
 
   favoritesOnlyInput?.addEventListener('change', evt => {
@@ -664,7 +713,8 @@
       favLabel.classList.toggle('is-active', favoritesOnly);
       favLabel.classList.toggle('is-favorite', favoritesOnly);
     }
-    render(allPokemon, selectedSort);
+    visibleCount = PAGE_SIZE;
+    renderVisible();
   });
 
   randomBtn?.addEventListener('click', () => {
@@ -682,6 +732,11 @@
   filterToggle?.addEventListener('click', () => {
     const isOpen = !filterPanel?.classList.contains('is-open');
     setPanelState(filterPanel, filterToggle, isOpen);
+  });
+
+  loadMoreBtn?.addEventListener('click', () => {
+    visibleCount += PAGE_SIZE;
+    renderVisible();
   });
 
   init();

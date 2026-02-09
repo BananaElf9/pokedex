@@ -692,6 +692,17 @@ h1 {
   gap: 14px;
 }
 
+.load-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 6px;
+}
+
+.load-more button {
+  padding: 10px 16px;
+  border-radius: 12px;
+}
+
 .mini-card {
   display: flex;
   flex-direction: column;
