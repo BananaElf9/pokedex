@@ -150,6 +150,7 @@
   const typeMembersByType = new Map();
   const loadingTypes = new Set();
   const typeLoadPromises = new Map();
+  let typesReady = false;
   const PAGE_SIZE = 60;
   let visibleCount = PAGE_SIZE;
 
@@ -575,7 +576,7 @@
       checkbox.type = 'checkbox';
       checkbox.value = type;
       checkbox.checked = selectedTypes.has(type);
-      checkbox.disabled = loadingTypes.has(type);
+      checkbox.disabled = !typesReady || loadingTypes.has(type);
       checkbox.addEventListener('change', async () => {
         if (checkbox.checked) {
           selectedTypes.add(type);
@@ -735,12 +736,13 @@
       renderSortFilters();
       loadFavorites();
       loadTeam();
+      renderTypeFilters();
+      setStatus('Loading type data…');
+      await fetchAllTypes();
+      typesReady = true;
+      renderTypeFilters();
       renderVisible();
       setStatus(`Loaded ${allPokemon.length} Pokémon.`);
-      fetchAllTypes().then(() => {
-        renderVisible();
-        setStatus('Types loaded.');
-      });
     } catch (err) {
       setStatus(err.message || 'Failed to load Pokémon.');
     }
