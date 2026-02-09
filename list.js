@@ -124,6 +124,17 @@
     fairy: '#d685ad'
   };
 
+  const typeRank = type => {
+    const idx = TYPE_ORDER.indexOf(type);
+    return idx === -1 ? 999 : idx;
+  };
+
+  const sortTypes = list =>
+    (list || []).slice().sort((a, b) => {
+      const diff = typeRank(a) - typeRank(b);
+      return diff !== 0 ? diff : a.localeCompare(b);
+    });
+
   let allPokemon = [];
   let pokemonByName = new Map();
   const selectedTypes = new Set();
@@ -136,7 +147,9 @@
   let query = '';
   let cardByName = new Map();
   const pokemonTypesByName = new Map();
-  let typesReady = false;
+  const typeMembersByType = new Map();
+  const loadingTypes = new Set();
+  const typeLoadPromises = new Map();
   const PAGE_SIZE = 60;
   let visibleCount = PAGE_SIZE;
 
@@ -238,52 +251,85 @@
     }));
   }
 
+  function upsertPokemonType(name, typeName) {
+    if (!name || !typeName) return;
+    const set = pokemonTypesByName.get(name) || new Set();
+    set.add(typeName);
+    pokemonTypesByName.set(name, set);
+    const mon = pokemonByName.get(name);
+    if (mon) {
+      mon.types = sortTypes(Array.from(set));
+      if (cardByName.has(mon.name)) {
+        updateCardDetails(mon);
+      }
+    }
+  }
+
   async function fetchAllTypes() {
-    const CONCURRENCY = 2;
-    const YIELD_MS = 80;
-    let index = 0;
+    const YIELD_MS = 120;
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-    async function worker() {
-      while (index < TYPE_ORDER.length) {
-        const current = index++;
-        const typeName = TYPE_ORDER[current];
-        try {
-          const res = await fetch(`https://pokeapi.co/api/v2/type/${typeName}`);
-          if (!res.ok) throw new Error('bad type');
-          const data = await res.json();
-          (data.pokemon || []).forEach(entry => {
-            const name = entry?.pokemon?.name;
-            if (!name) return;
-            const set = pokemonTypesByName.get(name) || new Set();
-            set.add(typeName);
-            pokemonTypesByName.set(name, set);
-          });
-        } catch (err) {
-          console.warn('Failed to load type', typeName, err);
-        } finally {
-          if (YIELD_MS) {
-            await sleep(YIELD_MS);
-          }
+    for (const typeName of TYPE_ORDER) {
+      if (typeMembersByType.has(typeName)) continue;
+      try {
+        const res = await fetch(`https://pokeapi.co/api/v2/type/${typeName}`);
+        if (!res.ok) throw new Error('bad type');
+        const data = await res.json();
+        const members = new Set();
+        (data.pokemon || []).forEach(entry => {
+          const name = entry?.pokemon?.name;
+          if (!name) return;
+          members.add(name);
+          upsertPokemonType(name, typeName);
+        });
+        typeMembersByType.set(typeName, members);
+      } catch (err) {
+        console.warn('Failed to load type', typeName, err);
+      } finally {
+        if (YIELD_MS) {
+          await sleep(YIELD_MS);
         }
       }
     }
+  }
 
-    const workers = Array.from({ length: CONCURRENCY }, worker);
-    await Promise.all(workers);
+  function ensureTypeData(typeName) {
+    if (!typeName) return Promise.resolve();
+    if (typeMembersByType.has(typeName)) return Promise.resolve();
+    if (typeLoadPromises.has(typeName)) return typeLoadPromises.get(typeName);
+
+    loadingTypes.add(typeName);
+    renderTypeFilters();
+    const promise = (async () => {
+      try {
+        const res = await fetch(`https://pokeapi.co/api/v2/type/${typeName}`);
+        if (!res.ok) throw new Error('bad type');
+        const data = await res.json();
+        const members = new Set();
+        (data.pokemon || []).forEach(entry => {
+          const name = entry?.pokemon?.name;
+          if (!name) return;
+          members.add(name);
+          upsertPokemonType(name, typeName);
+        });
+        typeMembersByType.set(typeName, members);
+      } catch (err) {
+        console.warn('Failed to load type', typeName, err);
+      } finally {
+        loadingTypes.delete(typeName);
+        typeLoadPromises.delete(typeName);
+        renderTypeFilters();
+      }
+    })();
+
+    typeLoadPromises.set(typeName, promise);
+    return promise;
   }
 
   function sortPokemon(pokemon, mode) {
     const list = [...pokemon];
-    const typeRank = type => {
-      const idx = TYPE_ORDER.indexOf(type);
-      return idx === -1 ? 999 : idx;
-    };
     const sortTypePair = mon => {
-      const types = (mon.types || []).slice().sort((a, b) => {
-        const diff = typeRank(a) - typeRank(b);
-        return diff !== 0 ? diff : a.localeCompare(b);
-      });
+      const types = sortTypes(mon.types || []);
       const primary = types[0] || '';
       const secondary = types[1] || '';
       return {
@@ -478,12 +524,6 @@
     }
   }
 
-  function applyTypeData() {
-    allPokemon.forEach(mon => {
-      const set = pokemonTypesByName.get(mon.name);
-      mon.types = set ? Array.from(set) : mon.types;
-    });
-  }
 
   function getTextColor(hex) {
     if (!hex) return '#fff';
@@ -534,14 +574,20 @@
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.value = type;
-      checkbox.disabled = !typesReady;
-      checkbox.addEventListener('change', () => {
+      checkbox.checked = selectedTypes.has(type);
+      checkbox.disabled = loadingTypes.has(type);
+      checkbox.addEventListener('change', async () => {
         if (checkbox.checked) {
           selectedTypes.add(type);
+          applyTypeStyle(label, type, checkbox.checked);
+          if (!typeMembersByType.has(type)) {
+            setStatus(`Loading ${type} types…`);
+            await ensureTypeData(type);
+          }
         } else {
           selectedTypes.delete(type);
+          applyTypeStyle(label, type, checkbox.checked);
         }
-        applyTypeStyle(label, type, checkbox.checked);
         visibleCount = PAGE_SIZE;
         renderVisible();
       });
@@ -690,13 +736,11 @@
       loadFavorites();
       loadTeam();
       renderVisible();
-      setStatus('Loading type data…');
-      await fetchAllTypes();
-      applyTypeData();
-      typesReady = true;
-      renderTypeFilters();
-      renderVisible();
       setStatus(`Loaded ${allPokemon.length} Pokémon.`);
+      fetchAllTypes().then(() => {
+        renderVisible();
+        setStatus('Types loaded.');
+      });
     } catch (err) {
       setStatus(err.message || 'Failed to load Pokémon.');
     }
@@ -741,14 +785,28 @@
     renderVisible();
   });
 
+  const handleAutoLoad = () => {
+    if (!loadMoreBtn || loadMoreBtn.hidden || loadMoreBtn.disabled) return;
+    visibleCount += PAGE_SIZE;
+    renderVisible();
+  };
+
   if (loadMoreBtn && 'IntersectionObserver' in window) {
     const observer = new IntersectionObserver(entries => {
       if (!entries.some(entry => entry.isIntersecting)) return;
-      if (loadMoreBtn.hidden || loadMoreBtn.disabled) return;
-      visibleCount += PAGE_SIZE;
-      renderVisible();
+      handleAutoLoad();
     }, { rootMargin: '200px 0px' });
     observer.observe(loadMoreBtn);
+  } else {
+    const onScroll = () => {
+      if (!loadMoreBtn || loadMoreBtn.hidden || loadMoreBtn.disabled) return;
+      const rect = loadMoreBtn.getBoundingClientRect();
+      if (rect.top - window.innerHeight < 200) {
+        handleAutoLoad();
+      }
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
   }
 
   init();
