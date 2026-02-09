@@ -49,6 +49,7 @@
   const effWeakEl = document.getElementById('eff-weak');
   const effResistEl = document.getElementById('eff-resist');
   const effImmuneEl = document.getElementById('eff-immune');
+  const effStrongEl = document.getElementById('eff-strong');
   const favoriteBtn = document.getElementById('favorite-btn');
   const teamBtn = document.getElementById('team-btn');
   const cryBtn = document.getElementById('cry-btn');
@@ -1457,7 +1458,8 @@
     const categorized = {
       weak: [],
       resist: [],
-      immune: []
+      immune: [],
+      strong: []
     };
 
     attackTypes.forEach(atk => {
@@ -1471,6 +1473,25 @@
     categorized.weak.sort(sortFn);
     categorized.resist.sort(sortFn);
     categorized.immune.sort((a, b) => a.name.localeCompare(b.name));
+
+    const offenseMult = {};
+    const applyOffense = (list, factor) => {
+      list.forEach(entry => {
+        const def = entry.name;
+        offenseMult[def] = (offenseMult[def] ?? 1) * factor;
+      });
+    };
+    for (const t of types) {
+      const data = await fetchType(t.type.name);
+      const rel = data.damage_relations;
+      applyOffense(rel.double_damage_to, 2);
+      applyOffense(rel.half_damage_to, 0.5);
+      applyOffense(rel.no_damage_to, 0);
+    }
+    Object.entries(offenseMult).forEach(([name, value]) => {
+      if (value >= 2) categorized.strong.push({ name, mult: value });
+    });
+    categorized.strong.sort(sortFn);
     return categorized;
   }
 
@@ -1514,6 +1535,7 @@
     fill(effWeakEl, eff.weak);
     fill(effResistEl, eff.resist);
     fill(effImmuneEl, eff.immune);
+    fill(effStrongEl, eff.strong || []);
   }
 
   async function fetchLocations(url) {
@@ -1664,7 +1686,7 @@
       renderFunFacts(null, null);
       renderMoves({ level: [], machine: [], egg: [] });
       renderGallery({});
-      renderEffectiveness({ weak: [], resist: [], immune: [] });
+      renderEffectiveness({ weak: [], resist: [], immune: [], strong: [] });
       setupVoice(null, '', '', '');
     } finally {
       toggleLoading(false);
