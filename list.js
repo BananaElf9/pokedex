@@ -135,10 +135,8 @@
   let team = [];
   let query = '';
   let cardByName = new Map();
-  let basicList = [];
-  let basicByName = new Map();
-  const fetchedDetails = new Set();
-  const fetchingDetails = new Set();
+  const pokemonTypesByName = new Map();
+  let typesReady = false;
   const PAGE_SIZE = 60;
   let visibleCount = PAGE_SIZE;
 
@@ -240,39 +238,30 @@
     }));
   }
 
-  async function fetchDetailsProgressive(basicList, { onItem, onProgress }) {
-    const CONCURRENCY = 4;
-    const YIELD_MS = 60;
+  async function fetchAllTypes() {
+    const CONCURRENCY = 2;
+    const YIELD_MS = 80;
     let index = 0;
-    let completed = 0;
-    const total = basicList.length;
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     async function worker() {
-      while (index < basicList.length) {
+      while (index < TYPE_ORDER.length) {
         const current = index++;
-        const entry = basicList[current];
+        const typeName = TYPE_ORDER[current];
         try {
-          const res = await fetch(entry.url);
-          if (!res.ok) throw new Error('bad status');
-          const detail = await res.json();
-          const payload = {
-            id: entry.id,
-            name: entry.name,
-            types: detail.types.map(t => t.type.name),
-            forms: getFormTags(entry.name),
-            speciesId: parseId(detail.species?.url || '') || entry.id,
-            sprite:
-              detail.sprites.other['official-artwork'].front_default ||
-              detail.sprites.front_default ||
-              spriteUrl(entry.id)
-          };
-          onItem?.(payload);
+          const res = await fetch(`https://pokeapi.co/api/v2/type/${typeName}`);
+          if (!res.ok) throw new Error('bad type');
+          const data = await res.json();
+          (data.pokemon || []).forEach(entry => {
+            const name = entry?.pokemon?.name;
+            if (!name) return;
+            const set = pokemonTypesByName.get(name) || new Set();
+            set.add(typeName);
+            pokemonTypesByName.set(name, set);
+          });
         } catch (err) {
-          console.warn('Failed to load', entry.name, err);
+          console.warn('Failed to load type', typeName, err);
         } finally {
-          completed += 1;
-          onProgress?.(completed, total);
           if (YIELD_MS) {
             await sleep(YIELD_MS);
           }
@@ -286,11 +275,41 @@
 
   function sortPokemon(pokemon, mode) {
     const list = [...pokemon];
+    const typeRank = type => {
+      const idx = TYPE_ORDER.indexOf(type);
+      return idx === -1 ? 999 : idx;
+    };
+    const sortTypePair = mon => {
+      const types = (mon.types || []).slice().sort((a, b) => {
+        const diff = typeRank(a) - typeRank(b);
+        return diff !== 0 ? diff : a.localeCompare(b);
+      });
+      const primary = types[0] || '';
+      const secondary = types[1] || '';
+      return {
+        primaryRank: typeRank(primary),
+        secondaryRank: typeRank(secondary),
+        primary,
+        secondary
+      };
+    };
+    const nameKey = name => String(name || '').replace(/-/g, ' ').toLowerCase();
     switch (mode) {
       case 'name':
-        return list.sort((a, b) => a.name.localeCompare(b.name));
+        return list.sort((a, b) => nameKey(a.name).localeCompare(nameKey(b.name)) || a.id - b.id);
       case 'type':
-        return list.sort((a, b) => (a.types[0] || '').localeCompare(b.types[0] || '') || a.id - b.id);
+        return list.sort((a, b) => {
+          const aType = sortTypePair(a);
+          const bType = sortTypePair(b);
+          return (
+            aType.primaryRank - bType.primaryRank ||
+            aType.secondaryRank - bType.secondaryRank ||
+            aType.primary.localeCompare(bType.primary) ||
+            aType.secondary.localeCompare(bType.secondary) ||
+            nameKey(a.name).localeCompare(nameKey(b.name)) ||
+            a.id - b.id
+          );
+        });
       case 'number':
       default:
         return list.sort((a, b) => a.id - b.id);
@@ -430,7 +449,6 @@
     const visible = sorted.slice(0, visibleCount);
     renderList(visible);
     updateLoadMoreButton(sorted.length);
-    queueVisibleDetails(visible);
   }
 
   function updateCardDetails(mon) {
@@ -460,33 +478,10 @@
     }
   }
 
-  function queueVisibleDetails(visible) {
-    if (!visible?.length) return;
-    const entries = visible
-      .map(mon => basicByName.get(mon.name))
-      .filter(entry => entry && !fetchedDetails.has(entry.name) && !fetchingDetails.has(entry.name));
-    if (!entries.length) return;
-    entries.forEach(entry => fetchingDetails.add(entry.name));
-    setStatus('Fetching details…');
-    fetchDetailsProgressive(entries, {
-      onItem: payload => {
-        const entry = pokemonByName.get(payload.name);
-        if (!entry) return;
-        entry.types = payload.types || entry.types;
-        entry.forms = payload.forms || entry.forms;
-        entry.speciesId = payload.speciesId || entry.speciesId;
-        entry.sprite = payload.sprite || entry.sprite;
-        fetchedDetails.add(entry.name);
-        fetchingDetails.delete(entry.name);
-        updateCardDetails(entry);
-      },
-      onProgress: (done, total) => {
-        if (done === total) {
-          setStatus(`Loaded ${total} Pokémon details.`);
-        } else if (done % 10 === 0) {
-          setStatus(`Fetching details… ${done}/${total}`);
-        }
-      }
+  function applyTypeData() {
+    allPokemon.forEach(mon => {
+      const set = pokemonTypesByName.get(mon.name);
+      mon.types = set ? Array.from(set) : mon.types;
     });
   }
 
@@ -539,6 +534,7 @@
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.value = type;
+      checkbox.disabled = !typesReady;
       checkbox.addEventListener('change', () => {
         if (checkbox.checked) {
           selectedTypes.add(type);
@@ -677,9 +673,8 @@
   async function init() {
     try {
       setStatus('Loading Pokémon list…');
-      basicList = await fetchList();
-      basicByName = new Map(basicList.map(entry => [entry.name, entry]));
-      allPokemon = basicList.map(entry => ({
+      const list = await fetchList();
+      allPokemon = list.map(entry => ({
         id: entry.id,
         name: entry.name,
         types: [],
@@ -695,6 +690,13 @@
       loadFavorites();
       loadTeam();
       renderVisible();
+      setStatus('Loading type data…');
+      await fetchAllTypes();
+      applyTypeData();
+      typesReady = true;
+      renderTypeFilters();
+      renderVisible();
+      setStatus(`Loaded ${allPokemon.length} Pokémon.`);
     } catch (err) {
       setStatus(err.message || 'Failed to load Pokémon.');
     }
@@ -738,6 +740,16 @@
     visibleCount += PAGE_SIZE;
     renderVisible();
   });
+
+  if (loadMoreBtn && 'IntersectionObserver' in window) {
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      if (loadMoreBtn.hidden || loadMoreBtn.disabled) return;
+      visibleCount += PAGE_SIZE;
+      renderVisible();
+    }, { rootMargin: '200px 0px' });
+    observer.observe(loadMoreBtn);
+  }
 
   init();
 })();
