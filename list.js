@@ -87,6 +87,8 @@
   };
   const FAVORITES_KEY = 'pokedex-favorites';
   const TEAM_KEY = 'pokedex-team';
+  const TYPE_CACHE_KEY = 'pokedex-types-cache';
+  const TYPE_CACHE_VERSION = 1;
   const MAX_TEAM = 6;
   const grid = document.getElementById('pokemon-grid');
   const loadStatus = document.getElementById('load-status');
@@ -196,6 +198,61 @@
 
   function saveStorage(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
+  }
+
+  function loadTypeCache() {
+    try {
+      const raw = localStorage.getItem(TYPE_CACHE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || data.version !== TYPE_CACHE_VERSION) return null;
+      if (!data.typesByName || typeof data.typesByName !== 'object') return null;
+      return data;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function cacheIsComplete(cache, pokemon) {
+    if (!cache || cache.count !== pokemon.length) return false;
+    return pokemon.every(mon => Array.isArray(cache.typesByName[mon.name]) && cache.typesByName[mon.name].length);
+  }
+
+  function applyTypeCache(cache, allowTypeIndex) {
+    if (!cache || !cache.typesByName) return 0;
+    let applied = 0;
+    Object.entries(cache.typesByName).forEach(([name, types]) => {
+      if (!Array.isArray(types) || !types.length) return;
+      const mon = pokemonByName.get(name);
+      if (!mon) return;
+      mon.types = sortTypes(types);
+      pokemonTypesByName.set(name, new Set(mon.types));
+      if (allowTypeIndex) {
+        mon.types.forEach(type => {
+          const set = typeMembersByType.get(type) || new Set();
+          set.add(name);
+          typeMembersByType.set(type, set);
+        });
+      }
+      applied += 1;
+    });
+    return applied;
+  }
+
+  function saveTypeCache() {
+    if (!allPokemon.length) return;
+    const typesByName = {};
+    allPokemon.forEach(mon => {
+      if (Array.isArray(mon.types) && mon.types.length) {
+        typesByName[mon.name] = mon.types.slice();
+      }
+    });
+    const payload = {
+      version: TYPE_CACHE_VERSION,
+      count: allPokemon.length,
+      typesByName
+    };
+    saveStorage(TYPE_CACHE_KEY, payload);
   }
 
   function loadFavorites() {
@@ -517,7 +574,7 @@
       types.innerHTML = '';
       (mon.types || []).forEach(type => {
         const pill = document.createElement('span');
-        pill.className = 'type-pill small';
+        pill.className = 'type-pill small type-pill--fade';
         pill.textContent = type;
         pill.style.background = typeColors[type] || '#e2e8f0';
         types.appendChild(pill);
@@ -730,19 +787,33 @@
         sprite: spriteUrl(entry.id)
       }));
       pokemonByName = new Map(allPokemon.map(mon => [mon.name, mon]));
+      loadFavorites();
+      loadTeam();
+
+      const cache = loadTypeCache();
+      const hasFullCache = cacheIsComplete(cache, allPokemon);
+      applyTypeCache(cache, hasFullCache);
+      typesReady = hasFullCache;
+
       renderTypeFilters();
       renderFormFilters();
       renderGenFilters();
       renderSortFilters();
-      loadFavorites();
-      loadTeam();
-      renderTypeFilters();
-      setStatus('Loading type data…');
-      await fetchAllTypes();
-      typesReady = true;
-      renderTypeFilters();
       renderVisible();
-      setStatus(`Loaded ${allPokemon.length} Pokémon.`);
+
+      if (typesReady) {
+        setStatus(`Loaded ${allPokemon.length} Pokémon.`);
+        return;
+      }
+
+      setStatus('Loading type data…');
+      fetchAllTypes().then(() => {
+        typesReady = true;
+        renderTypeFilters();
+        renderVisible();
+        saveTypeCache();
+        setStatus(`Loaded ${allPokemon.length} Pokémon.`);
+      });
     } catch (err) {
       setStatus(err.message || 'Failed to load Pokémon.');
     }
