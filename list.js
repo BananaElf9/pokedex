@@ -232,10 +232,12 @@
   }
 
   async function fetchDetailsProgressive(basicList, { onItem, onProgress }) {
-    const CONCURRENCY = 16;
+    const CONCURRENCY = 4;
+    const YIELD_MS = 60;
     let index = 0;
     let completed = 0;
     const total = basicList.length;
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     async function worker() {
       while (index < basicList.length) {
@@ -262,6 +264,9 @@
         } finally {
           completed += 1;
           onProgress?.(completed, total);
+          if (YIELD_MS) {
+            await sleep(YIELD_MS);
+          }
         }
       }
     }
