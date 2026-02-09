@@ -945,6 +945,16 @@ h1 {
   flex-wrap: wrap;
 }
 
+.sprite-frame {
+  width: 180px;
+  height: 180px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
+  flex-shrink: 0;
+}
+
 .type-pill {
   padding: 6px 10px;
   border-radius: 999px;
@@ -959,8 +969,8 @@ h1 {
   height: 160px;
   object-fit: contain;
   filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.35));
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, transparent 60%);
-  border-radius: 50%;
+  background: transparent;
+  border-radius: 0;
   transition: transform 180ms ease, filter 180ms ease;
 }
 
@@ -1424,9 +1434,56 @@ h1 {
 }
 
 @media (max-width: 680px) {
+  .pager-card {
+    grid-template-columns: 28px 1fr 28px;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "arrow media arrow2"
+      "name name name";
+    text-align: center;
+    padding: 10px 12px;
+  }
+
+  .pager-card__media {
+    grid-area: media;
+    justify-self: center;
+  }
+
+  #prev-card .pager-card__arrow {
+    grid-area: arrow;
+    justify-self: start;
+  }
+
+  #next-card .pager-card__arrow {
+    grid-area: arrow2;
+    justify-self: end;
+  }
+
+  #next-card {
+    text-align: center;
+  }
+
+  #next-card .pager-card__media {
+    justify-self: center;
+  }
+
+  .pager-card__meta {
+    grid-area: name;
+    align-items: center;
+  }
+
+  .pager-card__name {
+    white-space: normal;
+  }
+
   .card__header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .sprite-frame {
+    width: 160px;
+    height: 160px;
   }
 
   .sprite {
