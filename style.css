@@ -1442,6 +1442,7 @@ h1 {
       "name name name";
     text-align: center;
     padding: 10px 12px;
+    justify-items: center;
   }
 
   .pager-card__media {
@@ -1459,7 +1460,8 @@ h1 {
     justify-self: end;
   }
 
-  #next-card {
+  .pager-card#next-card {
+    grid-template-columns: 28px 1fr 28px;
     text-align: center;
   }
 
