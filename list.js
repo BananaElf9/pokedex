@@ -133,6 +133,7 @@
   let favorites = new Set();
   let team = [];
   let query = '';
+  let cardByName = new Map();
 
   let statusTimer = null;
 
@@ -230,10 +231,11 @@
     }));
   }
 
-  async function fetchDetails(basicList) {
-    const CONCURRENCY = 20;
+  async function fetchDetailsProgressive(basicList, { onItem, onProgress }) {
+    const CONCURRENCY = 16;
     let index = 0;
-    const results = [];
+    let completed = 0;
+    const total = basicList.length;
 
     async function worker() {
       while (index < basicList.length) {
@@ -243,24 +245,29 @@
           const res = await fetch(entry.url);
           if (!res.ok) throw new Error('bad status');
           const detail = await res.json();
-          results.push({
+          const payload = {
             id: entry.id,
             name: entry.name,
             types: detail.types.map(t => t.type.name),
             forms: getFormTags(entry.name),
             speciesId: parseId(detail.species?.url || '') || entry.id,
-            sprite: detail.sprites.other['official-artwork'].front_default || detail.sprites.front_default || spriteUrl(entry.id)
-          });
+            sprite:
+              detail.sprites.other['official-artwork'].front_default ||
+              detail.sprites.front_default ||
+              spriteUrl(entry.id)
+          };
+          onItem?.(payload);
         } catch (err) {
-          // Skip problematic entries but keep app running.
           console.warn('Failed to load', entry.name, err);
+        } finally {
+          completed += 1;
+          onProgress?.(completed, total);
         }
       }
     }
 
     const workers = Array.from({ length: CONCURRENCY }, worker);
     await Promise.all(workers);
-    return results;
   }
 
   function sortPokemon(pokemon, mode) {
@@ -310,6 +317,7 @@
     const filtered = filterPokemon(pokemon);
     const sorted = sortPokemon(filtered, mode);
     grid.innerHTML = '';
+    cardByName = new Map();
     const frag = document.createDocumentFragment();
 
     sorted.forEach(mon => {
@@ -381,9 +389,37 @@
       meta.append(name, types);
       card.append(img, meta, actions);
       frag.appendChild(card);
+      cardByName.set(mon.name, card);
     });
 
     grid.appendChild(frag);
+  }
+
+  function updateCardDetails(mon) {
+    const card = cardByName.get(mon.name);
+    if (!card) return;
+
+    const img = card.querySelector('img');
+    if (img && mon.sprite) {
+      img.src = mon.sprite;
+    }
+
+    const name = card.querySelector('.mini-card__name');
+    if (name) {
+      name.textContent = `#${String(mon.id).padStart(3, '0')} ${mon.name}`;
+    }
+
+    const types = card.querySelector('.mini-card__types');
+    if (types) {
+      types.innerHTML = '';
+      (mon.types || []).forEach(type => {
+        const pill = document.createElement('span');
+        pill.className = 'type-pill small';
+        pill.textContent = type;
+        pill.style.background = typeColors[type] || '#e2e8f0';
+        types.appendChild(pill);
+      });
+    }
   }
 
   function getTextColor(hex) {
@@ -568,11 +604,16 @@
 
   async function init() {
     try {
-      setStatus('Loading Pokémon (this may take a moment)…');
+      setStatus('Loading Pokémon list…');
       const basic = await fetchList();
-      setStatus('Fetching details…');
-      allPokemon = await fetchDetails(basic);
-      setStatus(`Loaded ${allPokemon.length} Pokémon.`);
+      allPokemon = basic.map(entry => ({
+        id: entry.id,
+        name: entry.name,
+        types: [],
+        forms: getFormTags(entry.name),
+        speciesId: entry.id,
+        sprite: spriteUrl(entry.id)
+      }));
       pokemonByName = new Map(allPokemon.map(mon => [mon.name, mon]));
       renderTypeFilters();
       renderFormFilters();
@@ -581,6 +622,26 @@
       loadFavorites();
       loadTeam();
       render(allPokemon, selectedSort);
+      setStatus('Fetching details…');
+
+      await fetchDetailsProgressive(basic, {
+        onItem: payload => {
+          const entry = pokemonByName.get(payload.name);
+          if (!entry) return;
+          entry.types = payload.types || entry.types;
+          entry.forms = payload.forms || entry.forms;
+          entry.speciesId = payload.speciesId || entry.speciesId;
+          entry.sprite = payload.sprite || entry.sprite;
+          updateCardDetails(entry);
+        },
+        onProgress: (done, total) => {
+          if (done === total) {
+            setStatus(`Loaded ${allPokemon.length} Pokémon.`);
+          } else if (done % 50 === 0) {
+            setStatus(`Fetching details… ${done}/${total}`);
+          }
+        }
+      });
     } catch (err) {
       setStatus(err.message || 'Failed to load Pokémon.');
     }
